@@ -13,8 +13,8 @@
 <body>
   <header class="app-header">
     <div class="identity"><span class="brand-mark" aria-hidden="true">a/</span><div><h1>ARM <span>/</span> STENCIL</h1><p>腕のためのステンシルスタジオ</p></div></div>
-    <div class="header-meta">肩から手首まで<span>成人男性・参考モデル</span></div>
-    <!-- app-version:start --><small id="app-version">v2</small><!-- app-version:end -->
+    <div class="header-meta">描画：肩から手首<span>成人男性・人体スキャン由来</span></div>
+    <!-- app-version:start --><small id="app-version">v3</small><!-- app-version:end -->
   </header>
   <main>
     <div class="toolbar" aria-label="描画ツール">
@@ -34,7 +34,7 @@
     <div class="workspace" data-active-tab="arm">
       <section id="arm-panel" class="arm-panel" aria-labelledby="arm-heading">
         <div class="panel-heading"><div><span class="step">01 / DRAW</span><h2 id="arm-heading">腕をキャンバスに。</h2></div><span class="panel-spec">RIGHT ARM / 540 mm</span></div>
-        <div id="viewport" class="viewport" aria-label="腕の3D描画領域">
+        <div id="viewport" class="viewport" aria-label="腕の3D描画領域" aria-describedby="gesture-help">
           <div id="loading" class="loading">腕モデルを準備しています…</div>
           <div class="anatomy-label shoulder-label" aria-hidden="true">肩<span>SHOULDER</span></div>
           <div class="anatomy-label wrist-label" aria-hidden="true">手首<span>WRIST</span></div>
@@ -64,10 +64,10 @@
         </div>
         <button id="export-jpg" type="button" class="export-button" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg><span>JPGを書き出す</span><span class="export-detail">150 dpi</span></button>
         <p id="export-status" class="export-status" role="status" aria-live="polite">線を描くと変換できます。</p>
-        <details class="print-notes"><summary>型紙と印刷について</summary><p>腕の内側を切れ目にし、肘で上腕・前腕に分けた近似型紙です。540 mmはモデルの参考寸法で、実際の腕には個人差があります。</p><p>JPGは150 dpi。50 mmの目盛を実測し、紙で仮合わせしてから転写してください。大きな型紙は印刷ソフトで分割印刷し、必要に応じて切り込みを入れます。</p><p>作業内容はこの画面を開いている間だけ保持されます。</p></details>
+        <details class="print-notes"><summary>型紙と印刷について</summary><p>腕の内側を切れ目にし、肘で上腕・前腕に分けた近似型紙です。540 mmはモデルの参考寸法で、実際の腕には個人差があります。手と指は表示用で、描画の対象は肩〜手首です。</p><p>JPGは150 dpi。50 mmの目盛を実測し、紙で仮合わせしてから転写してください。大きな型紙は印刷ソフトで分割印刷し、必要に応じて切り込みを入れます。</p><p>作業内容はこの画面を開いている間だけ保持されます。</p></details>
       </section>
     </div>
-    <footer class="app-footer"><span>3D → 腕の型紙 → 転写</span><span>近似展開 / 上腕 280 mm・前腕 260 mm</span></footer>
+    <footer class="app-footer"><span>3D → 腕の型紙 → 転写</span><span>近似展開 / 上腕 287 mm・前腕 253 mm</span></footer>
   </main>
   <noscript>このアプリの3D表示と描画にはJavaScriptが必要です。</noscript>
 </body>

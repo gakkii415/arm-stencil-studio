@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { ARM, createArmGeometry, pointOnArm } from './arm.js';
+import { ARM } from './arm.js';
+import { GLTFLoader } from '../vendor/loaders/GLTFLoader.js';
 import { renderStencil } from './stencil.js';
 import { SurfacePainter } from './paint.js';
 import { withJpegDensity } from './jpeg.js';
@@ -69,13 +70,29 @@ function invalidate() {
     }
     controls.update();
     renderer.render(scene, camera);
+    updateLandmarkLabels();
   });
 }
 
+function updateLandmarkLabels() {
+  if (!arm) return;
+  for (const [selector, y] of [['.shoulder-label', ARM.shoulderY], ['.wrist-label', ARM.wristY]]) {
+    const label = viewport.querySelector(selector);
+    const point = arm.localToWorld(new THREE.Vector3(0, y, 0)).project(camera);
+    const top = (1 - point.y) * viewport.clientHeight / 2;
+    label.hidden = point.z > 1 || top < 8 || top > viewport.clientHeight - 36;
+    label.style.bottom = 'auto';
+    label.style.top = `${top}px`;
+  }
+}
+
 function fitCamera() {
-  if (!camera || !viewport.clientHeight || !viewport.clientWidth) return;
-  const distance = Math.max(ARM.length / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) * 1.17, 640);
-  camera.position.set(distance * 0.32, distance * 0.06, distance * 0.95);
+  if (!camera || !arm || !viewport.clientHeight || !viewport.clientWidth) return;
+  const bounds = new THREE.Box3().setFromObject(arm);
+  const size = bounds.getSize(new THREE.Vector3());
+  bounds.getCenter(viewTarget);
+  const distance = Math.max(Math.max(size.y, size.x / camera.aspect) / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) * 1.08 + size.z * 0.35, 640);
+  camera.position.copy(viewTarget).add(new THREE.Vector3(distance * 0.28, distance * 0.04, distance * -0.96));
   controls.target.copy(viewTarget);
   camera.lookAt(viewTarget);
   controls.update();
@@ -93,12 +110,15 @@ function resize() {
 }
 
 function hitAt(event) {
+  if (!arm) return null;
   const bounds = renderer.domElement.getBoundingClientRect();
   pointer.set((event.clientX - bounds.left) / bounds.width * 2 - 1, -(event.clientY - bounds.top) / bounds.height * 2 + 1);
   raycaster.setFromCamera(pointer, camera);
-  const hit = raycaster.intersectObject(arm, false)[0];
-  if (!hit?.uv || hit.face.materialIndex !== 0) return null;
-  return { u: hit.uv.x, y: (1 - hit.uv.y) * ARM.length };
+  const hit = raycaster.intersectObject(arm, true)[0];
+  if (!hit?.uv || !hit.object.userData.paintable) return null;
+  const y = (1 - hit.uv.y) * ARM.length;
+  if (y < 0 || y > ARM.length) return null;
+  return { u: hit.uv.x, y };
 }
 
 function endStroke(event) {
@@ -155,7 +175,7 @@ async function exportJpg() {
   setStatus('JPGを作成しています…');
   let output;
   try {
-    // 642 × 360 mm at 150 dpi stays under common iOS canvas memory limits.
+    // 150 dpi keeps this model's full stencil below 16 megapixels.
     output = renderStencil(ink, { scale: 150 / 25.4, mirror: $('mirror').checked, guides: $('guides').checked });
     const blob = await new Promise((resolve) => output.toBlob(resolve, 'image/jpeg', 0.98));
     if (!blob) throw new Error('JPGを作成できませんでした。');
@@ -182,7 +202,8 @@ function undo() {
   if (painter.undo()) changed();
 }
 
-try {
+async function initialize() {
+ try {
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'low-power' });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -192,7 +213,7 @@ try {
   camera = new THREE.PerspectiveCamera(37, 1, 1, 5000);
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enablePan = false;
-  controls.minDistance = 390; controls.maxDistance = 1900;
+  controls.minDistance = 390; controls.maxDistance = 2500;
   controls.enableDamping = false;
   controls.addEventListener('change', invalidate);
   const display = document.createElement('canvas');
@@ -201,27 +222,27 @@ try {
   texture = new THREE.CanvasTexture(display);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 4);
-  texture.generateMipmaps = false;
-  texture.minFilter = THREE.LinearFilter;
-  arm = new THREE.Mesh(createArmGeometry(), [
-    new THREE.MeshStandardMaterial({ color: 0xe1c7aa, map: texture, roughness: 0.83 }),
-    new THREE.MeshStandardMaterial({ color: 0xbba58d, roughness: 0.95 }),
-  ]);
-  arm.rotation.z = -0.12;
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  const gltf = await new GLTFLoader().loadAsync(new URL('../assets/right-arm.glb', import.meta.url).href);
+  arm = gltf.scene;
+  arm.traverse((object) => {
+    if (!object.isMesh) return;
+    const paintable = object.userData.paintable === true || object.name.startsWith('paintable');
+    object.userData.paintable = paintable;
+    object.material = new THREE.MeshStandardMaterial({
+      color: 0xdfc1a0,
+      map: paintable ? texture : null,
+      roughness: 0.82,
+    });
+  });
+  arm.rotation.z = -0.06;
   scene.add(arm);
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x8b877d, 2.2));
-  const key = new THREE.DirectionalLight(0xffffff, 2.8);
-  key.position.set(-300, 500, 550); scene.add(key);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x858078, 1.9));
+  const key = new THREE.DirectionalLight(0xffffff, 2.5);
+  key.position.set(300, 450, -500); scene.add(key);
   const fill = new THREE.DirectionalLight(0xffeee1, 0.9);
-  fill.position.set(350, -100, -300); scene.add(fill);
-  // A quiet visible seam guide has no ink and is excluded from raycasting/export.
-  const seamGeometry = new THREE.BufferGeometry().setFromPoints(Array.from({ length: 91 }, (_, i) => {
-    const p = pointOnArm(0, i / 90 * ARM.length);
-    p.x -= 0.35;
-    return p;
-  }));
-  const seam = new THREE.Line(seamGeometry, new THREE.LineDashedMaterial({ color: 0x8b806e, dashSize: 4, gapSize: 4, transparent: true, opacity: 0.45 }));
-  seam.computeLineDistances(); arm.add(seam);
+  fill.position.set(-350, -100, 250); scene.add(fill);
   resize(); fitCamera(); setMode('draw');
   new ResizeObserver(resize).observe(viewport);
   $('loading').hidden = true;
@@ -254,10 +275,12 @@ try {
   renderer.domElement.addEventListener('webglcontextrestored', () => { $('loading').hidden = true; textureDirty = true; invalidate(); });
 } catch (error) {
   $('loading').hidden = false;
-  $('loading').textContent = '3D表示を開始できません。WebGLに対応したSafariやChromeで開き直してください。';
+  $('loading').textContent = '腕モデルを読み込めませんでした。通信状態を確認し、WebGLに対応したSafariやChromeで開き直してください。';
   $('loading').classList.add('error');
-  setStatus('3D表示を開始できませんでした。', true);
+  setStatus('腕モデルを読み込めませんでした。ページを開き直してください。', true);
+ }
 }
+initialize();
 
 for (const button of document.querySelectorAll('[data-mode]')) button.addEventListener('click', () => setMode(button.dataset.mode));
 for (const button of document.querySelectorAll('[data-tab]')) button.addEventListener('click', () => showTab(button.dataset.tab));

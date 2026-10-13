@@ -48,16 +48,11 @@
 
 ## Project Content Maturity
 
-- Core content: 描画/消去/視点の操作案内、上腕/前腕の位置と寸法、型紙と印刷の注意、状態/失敗表示。
-- Quality: UIは日本語、操作を短く具体的に説明。540mm等は参考モデル値、人体平均とは表記しない。
-- Pattern method: 内側の縦の切れ目と肘で分割し、周長に沿う近似型紙。紙の仮合わせと50mm校正線を案内する。左右反転は転写方法によって選ぶ。
-- Asset decision: 無料素材を調査し適切な加工済み腕を確認できなかったため、コードによる簡易腕を採用。調査素材自体は再配布しない。
-- Free asset research (2026-10-13):
-  - https://orange-juice-games.itch.io/male-base-mesh-arms は作者CC0表示、25KB ZIP内GLB。作者プレビューを視認し、左右腕・指・骨格付き、肘を曲げた低ポリ形状を確認。片腕抽出、指削除、姿勢変更が必要で不採用。GLBのUVは未確認。
-  - https://opengameart.org/content/3d-human-parts-pack はCC0表示。ZIPを実取得しface_2026.blendとpe.objのみ、腕なしを確認。不採用。
-  - SketchfabのAnatomy Arm / Realistic armは検索表示にCC Attributionがあるがページ403。実ファイルと許諾条件を確定できず不採用。CC0と推定しない。
-- Sleeve template source: https://www.stencilstudio.art/tools/patchwork-tattoo-sleeve-planner の実ページと腕のSVGを確認。肩側が広く手首へ細いテーパー、縦中心線、Outer/Inner/SideとFull sleeve/Upper arm/Forearmの区分を参考にした。掲載図は構図用の地図で実寸型紙ではないため、SVG/画像はコピーせずアプリ独自の基準周長で実寸幅を計算する。
-- Transfer sources:
-  - https://junotattoodesigns.com/how-to-apply-a-tattoo-stencil/ : 個人の腕長に合わせたサイズ変更・切断の説明。
-  - https://spirittattooproducts.com/pages/create-a-stencil : 転写時の紙のずれによる線の滲みに関するメーカー手順。
+- Core content: 描画/消去/視点の操作案内、型紙の寸法、印刷の注意、状態/失敗表示。
+- Quality: 日本語の短い操作説明。540mm等は参考モデル値、人体平均とは表記しない。手/指は表示用と説明する。
+- Asset: Blender Studio Human Base Meshes v1.4.1 の Body Male - Realistic / GEO-body_male_realistic を採用。作者Dan Ulrich、CC0。scan data model with multiresolution details。右上腕・前腕・手/指をFace Setsから切り出し、multires level2、縦向き回転と等方スケール。元の立体形状を保持し、描画座標と肩キャップを追加。
+- Source: https://www.blender.org/download/demo-files/ 。配布ZIP https://download.blender.org/demo/asset-bundles/human-base-meshes/human-base-meshes-bundle-v1.4.1.zip 。公式ページ・collection license・同梱READMEいずれもCC0。許諾 https://creativecommons.org/publicdomain/zero/1.0/ 。
+- Pattern: 元モデルの断面周長に沿う近似型紙。内側シームと肘で分割。紙の仮合わせと50mm校正線を案内する。
+- Template reference: https://www.stencilstudio.art/tools/patchwork-tattoo-sleeve-planner の腕SVGで広い肩→狭い手首のテーパー、中心線、Full sleeve/Upper arm/Forearmの区分を参考にした。構図用で実寸型紙ではないためコピーせず、モデル断面の周長から独自計算。
+- Transfer sources: https://junotattoodesigns.com/how-to-apply-a-tattoo-stencil/ (腕長による調整)、https://spirittattooproducts.com/pages/create-a-stencil (転写時の紙のずれ)。
 - Deferred: サンプル図案集、教材、宣伝文句、医療的な説明は中心フローに不要。

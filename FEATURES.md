@@ -46,11 +46,13 @@
 
 ## Project Feature Maturity
 
-- Product / core outcome: 成人男性を想定した単一の簡易腕へ黒線描画し、近似型紙JPGを作る最小MVP。
-- Core completion: Three.js表示、回転/ズーム、黒線、消しゴム、Undo、上腕/前腕型紙変換、JPG出力、iPhone/iPadのタッチ操作。
+- Product / core outcome: 人体スキャン由来の成人男性右腕へ黒線描画し、近似型紙JPGを作る最小MVP。
+- Core completion: Three.js表示、回転/ズーム、黒線、消しゴム、Undo、上腕/前腕型紙変換、JPG出力、iPhone/iPadタッチ。
+- Model: Blender Studio Human Base Meshes v1.4.1 / Dan UlrichのRealistic male (CC0) を切り出す。筋肉・肘・手首・指の原形を保持。手/指は表示用で描画対象は肩〜手首。
 - Data: 透過キャンバスとコンパクトな描画/消去履歴をメモリ保持。Undoは履歴の再描画。ログイン、永続保存、アップロード、外部APIなし。
-- Flow: 描画→変換→出力。描画変更後は古い型紙のJPG出力を無効化し再変換。出力設定変更は変換済みであれば即時反映。
-- Geometry: 肩〜手首540mm、内側縦シーム、肘280mmで2枚。高さごとの基準周長を用いたテーパー近似。
-- Output: 白背景150dpi JPG。642×360mm程度、50mm校正線、任意のガイドと線画だけの左右反転。iOSの大きなCanvas負荷を抑える。
-- Deferred: 個人寸法編集、複数腕、手/指、画像取り込み、クラウド保存、PDF、RedoはMVP外。
-- Durable: 厳密展開や実際の腕への一致を保証しない。新機能を足すより中心フローの可用性を優先する。
+- Flow: 描画→変換→出力。変更後は古い型紙の出力を無効化し再変換。全Undoは型紙を空表示へ戻す。
+- Geometry: 肩〜手首540mmへ等方スケール。モデル断面周長を参考型紙に反映し、腕内側の切れ目と肘で2枚に分ける。
+- Output: 白背景150dpi JPG、50mm校正線、任意ガイドと線画だけの左右反転。
+- Mobile: iPhone16の393×852 CSSpxで作業面663px、上下UIと下部の44px以上の操作領域で画面内へ収める。型紙のみ内部スクロール。
+- Deferred: 個人寸法編集、複数モデル、手/指への描画、画像取り込み、クラウド保存、PDF、RedoはMVP外。
+- Durable: 厳密展開や実際の腕への一致を保証しない。素材選定では既存の腕らしい形状を優先し、指や肩があるだけで候補を外さない。
