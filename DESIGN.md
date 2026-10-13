@@ -350,14 +350,14 @@ Yesの場合、装飾を追加する前に、構成、情報階層、コンテ�
 
 ## Project Direction
 
-- Product / users / primary task:
-- Context of use / target devices:
-- Desired impression:
-- Information density / hierarchy:
-- Reference products / source URLs:
-- Selected reference dimensions / what to borrow:
-- What not to copy / avoid:
-- Structural direction:
-- Typography / color / spacing / shape direction:
-- Motion / responsive direction:
-- Durable design decisions:
+- Product / users / primary task: 腕に沿うタトゥー線画を描き、転写用の近似型紙を作る作業ツール。
+- Context: PC、iPhone、iPad。短時間の編集、黒線のみ、標準参考寸法の腕1種類。
+- Reference: three.js editor https://threejs.org/editor/ のDesktop実画面とComputed Stylesを確認。作業領域75.7%、補助領域24.3%、36px上帯、14px Helvetica/Arial、平面、影なし。
+- Borrow: 作業対象を大きく見せる面分割、細い境界、上部への操作集約。低コントラスト、32pxボタン、scene tree、多数の設定は採用しない。
+- Compared structures: 左3D/右型紙の同時表示と、描画→結果の単一画面ステップ方式。Desktopは確認しながら描ける同時表示を採用、狭い画面は3D/2Dタブで作業面を確保。
+- Macrostructure: 左3D約65%、右型紙約35%、上部にツール。宣伝セクションや統計カードは置かない。
+- Typography: システム日本語フォント、本文14–16px、見出し20px、補助12px。操作は44px以上。
+- Color / surface: 暖色紙、墨色本文、薄い境界、操作だけ橙色。主要面は平面、ボタン4–6px角丸、影は型紙の紙面だけ。
+- Signature: 3D腕の黒線が上腕・前腕のテーパー型紙へ対応する作業画面。
+- Responsive: Mobileは結果タブへ切替。ツールを2行にまとめ、描画/視点モードを常時選べる。hover依存なし。
+- Scope: 最小MVPの機能・説明のみ。生成腕は医療解剖学モデルではなく、寸法は参考設定値。

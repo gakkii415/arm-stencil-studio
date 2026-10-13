@@ -46,11 +46,11 @@
 
 ## Project Feature Maturity
 
-- Product / users / core outcome:
-- Current maturity:
-- Core feature set / completion criteria:
-- Next target state:
-- Expansion Set:
-- Deferred or rejected items / reasons:
-- Important flows / states / data decisions:
-- Durable feature decisions:
+- Product / core outcome: 成人男性を想定した単一の簡易腕へ黒線描画し、近似型紙JPGを作る最小MVP。
+- Core completion: Three.js表示、回転/ズーム、黒線、消しゴム、Undo、上腕/前腕型紙変換、JPG出力、iPhone/iPadのタッチ操作。
+- Data: 透過キャンバスとコンパクトな描画/消去履歴をメモリ保持。Undoは履歴の再描画。ログイン、永続保存、アップロード、外部APIなし。
+- Flow: 描画→変換→出力。描画変更後は古い型紙のJPG出力を無効化し再変換。出力設定変更は変換済みであれば即時反映。
+- Geometry: 肩〜手首540mm、内側縦シーム、肘280mmで2枚。高さごとの基準周長を用いたテーパー近似。
+- Output: 白背景150dpi JPG。642×360mm程度、50mm校正線、任意のガイドと線画だけの左右反転。iOSの大きなCanvas負荷を抑える。
+- Deferred: 個人寸法編集、複数腕、手/指、画像取り込み、クラウド保存、PDF、RedoはMVP外。
+- Durable: 厳密展開や実際の腕への一致を保証しない。新機能を足すより中心フローの可用性を優先する。
