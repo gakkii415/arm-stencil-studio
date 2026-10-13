@@ -48,7 +48,7 @@
 
 ## Project Content Maturity
 
-- Core content: 描画/消去/視点の操作案内、型紙の寸法、印刷の注意、状態/失敗表示。
+- Core content: 描画/消去/視点の操作案内、型紙の寸法、印刷の注意、状態/失敗表示。iPhone/iPadは「写真に保存」→「画像を保存」を案内。未対応は実画像の長押し保存。共有の完了を写真ライブラリへの保存確認とは表記しない。
 - Quality: 日本語の短い操作説明。540mm等は参考モデル値、人体平均とは表記しない。手/指は表示用と説明する。
 - Asset: Blender Studio Human Base Meshes v1.4.1 の Body Male - Realistic / GEO-body_male_realistic を採用。作者Dan Ulrich、CC0。scan data model with multiresolution details。右上腕・前腕・手/指をFace Setsから切り出し、multires level2、縦向き回転と等方スケール。元の立体形状を保持し、描画座標と肩キャップを追加。
 - Source: https://www.blender.org/download/demo-files/ 。配布ZIP https://download.blender.org/demo/asset-bundles/human-base-meshes/human-base-meshes-bundle-v1.4.1.zip 。公式ページ・collection license・同梱READMEいずれもCC0。許諾 https://creativecommons.org/publicdomain/zero/1.0/ 。

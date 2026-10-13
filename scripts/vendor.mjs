@@ -7,6 +7,8 @@ for (const [source, target] of [
   ['node_modules/three/examples/jsm/loaders/GLTFLoader.js', 'vendor/loaders/GLTFLoader.js'],
   ['node_modules/three/examples/jsm/utils/BufferGeometryUtils.js', 'vendor/utils/BufferGeometryUtils.js'],
   ['node_modules/three/LICENSE', 'vendor/THREE-LICENSE.txt'],
+  ['node_modules/three-mesh-bvh/build/index.module.js', 'vendor/three-mesh-bvh.js'],
+  ['node_modules/three-mesh-bvh/LICENSE', 'vendor/THREE-MESH-BVH-LICENSE.txt'],
 ]) {
   await mkdir(target.slice(0, target.lastIndexOf('/')), { recursive: true });
   await copyFile(source, target);

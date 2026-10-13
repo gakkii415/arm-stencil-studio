@@ -56,3 +56,10 @@ input[type=range]{height:44px;margin-top:0}
 
 [hidden]{display:none!important}
 @media(prefers-reduced-motion:reduce){button{transition:none}}
+
+#save-image-dialog{width:min(94vw,800px);max-height:90dvh;overflow:auto;border:1px solid var(--line);border-radius:6px;padding:18px;background:var(--white);color:var(--ink)}
+#save-image-dialog::backdrop{background:#0008}
+.save-dialog-header{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.save-dialog-header h2{margin:0;font-size:17px}
+#save-image-dialog p{font-size:13px;line-height:1.8}
+#save-image-preview{display:block;width:100%;height:auto;background:white;user-select:auto;-webkit-touch-callout:default}

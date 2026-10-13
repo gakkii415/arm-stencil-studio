@@ -5,6 +5,8 @@ import { GLTFLoader } from '../vendor/loaders/GLTFLoader.js';
 import { renderStencil } from './stencil.js';
 import { SurfacePainter } from './paint.js';
 import { withJpegDensity } from './jpeg.js';
+import { isPhotoLibraryDevice, saveImage } from './image-export.js';
+import { MeshBVH, acceleratedRaycast } from '../vendor/three-mesh-bvh.js';
 
 const $ = (id) => document.getElementById(id);
 const viewport = $('viewport');
@@ -15,18 +17,28 @@ const exportButton = $('export-jpg');
 const preview = $('stencil-canvas');
 const ink = document.createElement('canvas');
 ink.width = 2048; ink.height = 4096;
-const painter = new SurfacePainter(ink);
+const painter = new SurfacePainter(ink, { deferred: true });
 let mode = 'draw';
 let converted = false;
 let stale = false;
 let pointerId = null;
 let exporting = false;
 let textureDirty = true;
-let renderer, camera, controls, arm, scene, texture, displayContext;
+let renderer, camera, controls, arm, scene, texture;
 let renderPending = false;
+let labelsDirty = true;
+let pendingPoints = [];
+let drawingBounds = null;
+let preparedFile = null;
+let preparing = false;
+let imageRevision = 0;
+let previewCleanup = null;
 const pointer = new THREE.Vector2();
 const raycaster = new THREE.Raycaster();
+raycaster.firstHitOnly = true;
 const viewTarget = new THREE.Vector3(0, 0, 0);
+const photoLibrary = isPhotoLibraryDevice();
+if (photoLibrary) $('save-label').textContent = '写真に保存';
 
 function setStatus(message, error = false) {
   status.textContent = message;
@@ -36,10 +48,14 @@ function setStatus(message, error = false) {
 function updateButtons() {
   undoButton.disabled = !painter.operations.length || exporting;
   convertButton.disabled = !painter.operations.some((op) => op.mode === 'draw') || exporting;
-  exportButton.disabled = !converted || stale || exporting;
+  exportButton.disabled = !converted || stale || !preparedFile || preparing || exporting;
+  for (const id of ['mirror', 'guides']) $(id).disabled = exporting;
 }
 
 function changed() {
+  imageRevision += 1;
+  preparedFile = null;
+  preparing = false;
   textureDirty = true;
   const hasDrawing = painter.operations.some((op) => op.mode === 'draw');
   if (!hasDrawing) {
@@ -60,18 +76,26 @@ function invalidate() {
   renderPending = true;
   requestAnimationFrame(() => {
     renderPending = false;
+    flushInput();
     if (textureDirty) {
-      displayContext.globalCompositeOperation = 'source-over';
-      displayContext.fillStyle = '#fff';
-      displayContext.fillRect(0, 0, ink.width, ink.height);
-      displayContext.drawImage(ink, 0, 0);
       texture.needsUpdate = true;
       textureDirty = false;
     }
     controls.update();
     renderer.render(scene, camera);
-    updateLandmarkLabels();
+    if (labelsDirty) { updateLandmarkLabels(); labelsDirty = false; }
   });
+}
+
+function flushInput() {
+  const points = pendingPoints;
+  pendingPoints = [];
+  const count = Math.min(points.length, 16);
+  for (let i = 0; i < count; i += 1) {
+    const index = count === points.length ? i : Math.round(i * (points.length - 1) / (count - 1));
+    painter.add(hitAt(points[index], drawingBounds));
+  }
+  if (count) textureDirty = true;
 }
 
 function updateLandmarkLabels() {
@@ -106,12 +130,13 @@ function resize() {
   renderer.setSize(width, height, false);
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
+  labelsDirty = true;
   invalidate();
 }
 
-function hitAt(event) {
+function hitAt(event, bounds = drawingBounds) {
   if (!arm) return null;
-  const bounds = renderer.domElement.getBoundingClientRect();
+  bounds ||= renderer.domElement.getBoundingClientRect();
   pointer.set((event.clientX - bounds.left) / bounds.width * 2 - 1, -(event.clientY - bounds.top) / bounds.height * 2 + 1);
   raycaster.setFromCamera(pointer, camera);
   const hit = raycaster.intersectObject(arm, true)[0];
@@ -123,8 +148,10 @@ function hitAt(event) {
 
 function endStroke(event) {
   if (pointerId === null || (event && event.pointerId !== pointerId)) return;
+  flushInput();
   const oldId = pointerId;
   pointerId = null;
+  drawingBounds = null;
   if (renderer.domElement.hasPointerCapture(oldId)) renderer.domElement.releasePointerCapture(oldId);
   if (painter.end()) changed();
 }
@@ -154,6 +181,7 @@ function convert() {
   if (convertButton.disabled) return;
   endStroke();
   try {
+    painter.rasterize();
     const result = renderStencil(ink, { scale: 2, mirror: $('mirror').checked, guides: $('guides').checked });
     preview.width = result.width; preview.height = result.height;
     preview.getContext('2d').drawImage(result, 0, 0);
@@ -162,36 +190,68 @@ function convert() {
     $('empty-state').hidden = true;
     converted = true; stale = false;
     updateButtons();
-    setStatus('上腕・前腕の型紙に変換しました。JPGで書き出せます。');
+    prepareImage();
     if (matchMedia('(max-width: 760px)').matches) showTab('stencil');
   } catch (error) {
     setStatus(error.message || '変換できませんでした。もう一度お試しください。', true);
   }
 }
 
+async function prepareImage() {
+  const revision = ++imageRevision;
+  preparedFile = null;
+  preparing = true;
+  updateButtons();
+  setStatus('保存する画像を準備しています…');
+  let output;
+  try {
+    // Paint the converted preview first, then prepare the file before a Save tap.
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    if (revision !== imageRevision) return;
+    output = renderStencil(ink, { scale: 150 / 25.4, mirror: $('mirror').checked, guides: $('guides').checked });
+    const blob = await new Promise((resolve) => output.toBlob(resolve, 'image/jpeg', 0.98));
+    if (!blob) throw new Error('画像を作成できませんでした。');
+    const bytes = withJpegDensity(new Uint8Array(await blob.arrayBuffer()), 150);
+    if (revision !== imageRevision) return;
+    preparedFile = new File([bytes], `arm-stencil${$('mirror').checked ? '-mirrored' : ''}.jpg`, { type: 'image/jpeg' });
+    setStatus(photoLibrary ? '「写真に保存」→共有画面の「画像を保存」で写真アプリへ保存できます。' : 'JPG画像を保存できます。');
+  } catch (error) {
+    if (revision === imageRevision) setStatus(error.message || '画像を準備できませんでした。再変換してください。', true);
+  } finally {
+    if (output) { output.width = 0; output.height = 0; }
+    if (revision === imageRevision) { preparing = false; updateButtons(); }
+  }
+}
+
+function closeImagePreview() {
+  $('save-image-preview').removeAttribute('src');
+  previewCleanup?.();
+  previewCleanup = null;
+}
+
 async function exportJpg() {
   if (exportButton.disabled) return;
   exporting = true; updateButtons();
-  setStatus('JPGを作成しています…');
-  let output;
+  setStatus(photoLibrary ? '共有画面の「画像を保存」を選んでください。' : 'JPG画像を保存しています…');
   try {
-    // 150 dpi keeps this model's full stencil below 16 megapixels.
-    output = renderStencil(ink, { scale: 150 / 25.4, mirror: $('mirror').checked, guides: $('guides').checked });
-    const blob = await new Promise((resolve) => output.toBlob(resolve, 'image/jpeg', 0.98));
-    if (!blob) throw new Error('JPGを作成できませんでした。');
-    const bytes = withJpegDensity(new Uint8Array(await blob.arrayBuffer()), 150);
-    const jpeg = new Blob([bytes], { type: 'image/jpeg' });
-    const url = URL.createObjectURL(jpeg);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `arm-stencil${$('mirror').checked ? '-mirrored' : ''}.jpg`;
-    document.body.append(link); link.click(); link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
-    setStatus('JPGをダウンロードしました。印刷時は50 mmの目盛を確認してください。');
+    // No encoding awaits here: iOS sharing must begin within this user gesture.
+    const result = await saveImage(preparedFile);
+    if (result.mode === 'preview') {
+      closeImagePreview();
+      previewCleanup = result.cleanup;
+      $('save-image-preview').src = result.url;
+      $('save-image-dialog').showModal();
+      setStatus('表示された画像を長押しし、「画像を保存」を選んでください。');
+    } else if (result.mode === 'canceled') {
+      setStatus('共有を取り消しました。もう一度「写真に保存」から開けます。');
+    } else if (result.mode === 'shared') {
+      setStatus('画像を共有しました。「画像を保存」を選ぶと写真アプリに保存されます。');
+    } else {
+      setStatus('JPGをダウンロードしました。印刷時は50 mmの目盛を確認してください。');
+    }
   } catch (error) {
-    setStatus(error.message || 'JPGを書き出せませんでした。', true);
+    setStatus(error.message || '画像を保存できませんでした。もう一度お試しください。', true);
   } finally {
-    if (output) { output.width = 0; output.height = 0; }
     exporting = false; updateButtons();
   }
 }
@@ -205,7 +265,7 @@ function undo() {
 async function initialize() {
  try {
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'low-power' });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.domElement.setAttribute('aria-label', 'ドラッグして腕の表面に描画');
   viewport.prepend(renderer.domElement);
@@ -215,10 +275,10 @@ async function initialize() {
   controls.enablePan = false;
   controls.minDistance = 390; controls.maxDistance = 2500;
   controls.enableDamping = false;
-  controls.addEventListener('change', invalidate);
+  controls.addEventListener('change', () => { labelsDirty = true; invalidate(); });
   const display = document.createElement('canvas');
-  display.width = ink.width; display.height = ink.height;
-  displayContext = display.getContext('2d');
+  display.width = 512; display.height = 1024;
+  painter.attachPreview(display);
   texture = new THREE.CanvasTexture(display);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 4);
@@ -228,6 +288,8 @@ async function initialize() {
   arm = gltf.scene;
   arm.traverse((object) => {
     if (!object.isMesh) return;
+    object.geometry.boundsTree = new MeshBVH(object.geometry, { indirect: true });
+    object.raycast = acceleratedRaycast;
     const paintable = object.userData.paintable === true || object.name.startsWith('paintable');
     object.userData.paintable = paintable;
     object.material = new THREE.MeshStandardMaterial({
@@ -250,20 +312,21 @@ async function initialize() {
   renderer.domElement.addEventListener('pointerdown', (event) => {
     if (mode === 'view' || event.button !== 0 || pointerId !== null || exporting) return;
     event.preventDefault();
-    const point = hitAt(event);
-    if (!point) return;
+    drawingBounds = renderer.domElement.getBoundingClientRect();
+    const point = hitAt(event, drawingBounds);
+    if (!point) { drawingBounds = null; return; }
     pointerId = event.pointerId;
     renderer.domElement.setPointerCapture(pointerId);
     painter.begin(mode, Number($('brush-size').value) * (mode === 'erase' ? 4 : 1));
     painter.add(point);
-    textureDirty = true; invalidate();
+    changed();
   });
   renderer.domElement.addEventListener('pointermove', (event) => {
     if (pointerId !== event.pointerId) return;
     event.preventDefault();
     const events = event.getCoalescedEvents?.() || [];
-    for (const pointEvent of events.length ? events : [event]) painter.add(hitAt(pointEvent));
-    textureDirty = true; invalidate();
+    for (const pointEvent of events.length ? events : [event]) pendingPoints.push({ clientX: pointEvent.clientX, clientY: pointEvent.clientY });
+    invalidate();
   });
   for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) renderer.domElement.addEventListener(event, endStroke);
   renderer.domElement.addEventListener('contextmenu', (event) => event.preventDefault());
@@ -304,3 +367,6 @@ window.addEventListener('keydown', (event) => {
     if (next) setMode(next);
   }
 });
+
+$('close-save-preview').addEventListener('click', () => $('save-image-dialog').close());
+$('save-image-dialog').addEventListener('close', closeImagePreview);

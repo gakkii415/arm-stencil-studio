@@ -14,7 +14,7 @@
   <header class="app-header">
     <div class="identity"><span class="brand-mark" aria-hidden="true">a/</span><div><h1>ARM <span>/</span> STENCIL</h1><p>腕のためのステンシルスタジオ</p></div></div>
     <div class="header-meta">描画：肩から手首<span>成人男性・人体スキャン由来</span></div>
-    <!-- app-version:start --><small id="app-version">v3</small><!-- app-version:end -->
+    <!-- app-version:start --><small id="app-version">v4</small><!-- app-version:end -->
   </header>
   <main>
     <div class="toolbar" aria-label="描画ツール">
@@ -23,7 +23,7 @@
         <button type="button" data-mode="erase" aria-pressed="false" title="消しゴム (E)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 14 10-10 7 7-10 10H9l-5-5v-2Zm5-5 7 7M11 21h10"/></svg><span>消す</span></button>
         <button type="button" data-mode="view" aria-pressed="false" title="視点を回転 (V)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14-5L3 9m0-6v6h6M4 13a8 8 0 0 0 14 5l3-3m0 6v-6h-6"/></svg><span>視点</span></button>
       </div>
-      <div class="brush-control"><label for="brush-size">線幅 <output id="brush-value" for="brush-size">1.2 mm</output></label><input id="brush-size" type="range" min="0.5" max="4" step="0.1" value="1.2" aria-label="線幅（ミリメートル）"></div>
+      <div class="brush-control"><label for="brush-size">線幅 <output id="brush-value" for="brush-size">2.5 mm</output></label><input id="brush-size" type="range" min="0.5" max="4" step="0.1" value="2.5" aria-label="線幅（ミリメートル）"></div>
       <button id="undo" type="button" class="quiet" disabled title="元に戻す (⌘ / Ctrl + Z)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 4-5 5 5 5M3 9h10a7 7 0 0 1 0 14"/></svg><span>戻す</span></button>
       <button id="convert" type="button" class="primary" disabled>2Dステンシルに変換 <span aria-hidden="true">↗</span></button>
     </div>
@@ -62,13 +62,18 @@
           <label><input type="checkbox" id="mirror">左右反転 <span>転写方法に合わせる</span></label>
           <label><input type="checkbox" id="guides" checked>型紙ガイドを含める</label>
         </div>
-        <button id="export-jpg" type="button" class="export-button" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg><span>JPGを書き出す</span><span class="export-detail">150 dpi</span></button>
+        <button id="export-jpg" type="button" class="export-button" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg><span id="save-label">JPGを書き出す</span><span class="export-detail">150 dpi</span></button>
         <p id="export-status" class="export-status" role="status" aria-live="polite">線を描くと変換できます。</p>
         <details class="print-notes"><summary>型紙と印刷について</summary><p>腕の内側を切れ目にし、肘で上腕・前腕に分けた近似型紙です。540 mmはモデルの参考寸法で、実際の腕には個人差があります。手と指は表示用で、描画の対象は肩〜手首です。</p><p>JPGは150 dpi。50 mmの目盛を実測し、紙で仮合わせしてから転写してください。大きな型紙は印刷ソフトで分割印刷し、必要に応じて切り込みを入れます。</p><p>作業内容はこの画面を開いている間だけ保持されます。</p></details>
       </section>
     </div>
     <footer class="app-footer"><span>3D → 腕の型紙 → 転写</span><span>近似展開 / 上腕 287 mm・前腕 253 mm</span></footer>
   </main>
+  <dialog id="save-image-dialog" aria-labelledby="save-image-heading">
+    <div class="save-dialog-header"><h2 id="save-image-heading">写真に保存</h2><button id="close-save-preview" type="button">閉じる</button></div>
+    <p>画像を長押しして「画像を保存」を選ぶと、写真アプリに保存できます。</p>
+    <img id="save-image-preview" alt="写真アプリへ保存するステンシル画像">
+  </dialog>
   <noscript>このアプリの3D表示と描画にはJavaScriptが必要です。</noscript>
 </body>
 </html>
