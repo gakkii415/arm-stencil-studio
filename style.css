@@ -3,6 +3,23 @@
 @media(min-width:1500px){main{max-width:1700px;margin:0 auto;border-left:1px solid var(--line);border-right:1px solid var(--line)}.viewport{min-height:530px}.workspace{min-height:710px}}
 @media(max-width:1050px){.toolbar{gap:12px;padding:14px 22px}.app-header{padding:0 22px}.tool-group button{min-width:72px;padding:0 10px}.brush-control{width:125px;margin-left:0}.primary{padding:0 14px;font-size:12px}.primary span{padding-left:3px}.panel-heading{padding-left:24px;padding-right:24px}.panel-spec{display:none}.stencil-panel{padding-left:22px;padding-right:22px}.mode-indicator{left:24px}.canvas-footer{padding-left:24px;padding-right:24px}.workspace{grid-template-columns:minmax(0,1.3fr) minmax(320px,1fr)}}
 
+/* Model choices share the header; color choices sit over unused canvas space. */
+button,input,select,summary{font:inherit}
+select{min-height:44px;border:1px solid var(--line);border-radius:5px;background:var(--white);color:var(--ink);padding:0 9px;font-size:14px;cursor:pointer}
+select:disabled{cursor:default;opacity:.42}
+select:focus-visible{outline:3px solid #cf754b;outline-offset:3px}
+.model-selectors{display:flex;align-items:center;gap:14px;margin-left:auto}
+.model-selectors label{display:flex;align-items:center;gap:7px}
+.model-selectors label>span{font-size:11px;color:var(--muted);white-space:nowrap}
+#sex-select{width:84px}
+#part-select{width:84px}
+.header-meta{margin-left:0}
+.header-meta #model-label{color:var(--ink);font-size:12px;margin-top:0}
+.color-palette{position:absolute;z-index:2;left:32px;top:12px;display:flex;background:var(--white);outline:1px solid var(--line);border-radius:5px}
+.color-button{width:44px;min-width:44px;min-height:44px;padding:0;border:0;position:relative}
+.color-swatch{width:21px;height:21px;border-radius:50%;background:var(--swatch);border:1px solid #00000016}
+.color-button[aria-pressed=true] .color-swatch{outline:2px solid var(--ink);outline-offset:3px}
+.color-button[aria-pressed=true]::after{content:"";width:5px;height:5px;background:var(--white);border:1px solid #00000012;border-radius:50%;position:absolute;inset:auto 19px 19px auto}
 .quiet{min-width:44px}
 input[type=range]{height:44px;margin-top:0}
 .export-settings label{min-height:44px}
@@ -10,12 +27,17 @@ input[type=range]{height:44px;margin-top:0}
 /* On phones the canvas owns the remaining viewport; tools stay within thumb reach. */
 @media(max-width:760px){
   body{height:100vh;height:100dvh;overflow:hidden;display:flex;flex-direction:column}
-  .app-header{height:calc(44px + env(safe-area-inset-top));flex:none;padding:env(safe-area-inset-top) 14px 0;gap:12px}
-  .identity{gap:8px}
-  .brand-mark{font-size:25px;letter-spacing:-4px;padding-right:5px}
-  .identity h1{font-size:13px;letter-spacing:1px}
+  .app-header{height:calc(44px + env(safe-area-inset-top));flex:none;padding:env(safe-area-inset-top) 14px 0;gap:10px;border-bottom:0;box-shadow:inset 0 -1px var(--line)}
+  .identity{gap:0;flex-shrink:0}
+  .brand-mark{display:none}
+  .identity h1{font-size:12px;letter-spacing:.3px}
   .identity p,.header-meta{display:none}
-  #app-version{margin-left:auto;padding-left:12px;font-size:10px}
+  .model-selectors{gap:5px;min-width:0}
+  .model-selectors label>span{display:none}
+  .model-selectors select{height:44px;font-size:16px;padding:0 7px;background:transparent;border:0;border-radius:0}
+  #sex-select{width:74px}
+  #part-select{width:74px}
+  #app-version{flex-shrink:0;margin-left:0;padding-left:8px;font-size:10px}
   main{flex:1;min-height:0;display:grid;grid-template-rows:44px minmax(0,1fr) auto}
   .mobile-tabs{grid-row:1;display:flex;min-width:0;border-bottom:1px solid var(--line);background:#ebe7de}
   .mobile-tabs button{flex:1;border:0;border-radius:0;font-size:12px;min-height:44px;color:var(--muted)}
@@ -25,6 +47,7 @@ input[type=range]{height:44px;margin-top:0}
   .arm-panel{height:100%;min-height:0;border-right:0}
   .panel-heading,.canvas-footer,.app-footer{display:none}
   .viewport{flex:1;min-height:0;height:auto;max-height:none}
+  .color-palette{left:12px;top:12px}
   .anatomy-label{left:7%;font-size:10px;width:40px}
   .anatomy-label span{display:none}
   .mode-indicator{left:14px;bottom:14px;font-size:10px}
@@ -46,6 +69,10 @@ input[type=range]{height:44px;margin-top:0}
   .export-status{margin-bottom:12px}
 }
 @media(max-width:360px){
+  .app-header{gap:5px;padding-left:8px;padding-right:8px}
+  .identity h1{font-size:11px;letter-spacing:0}
+  .model-selectors{gap:0}
+  #app-version{padding-left:5px}
   .toolbar{grid-template-columns:115px minmax(0,1fr) 44px;gap:4px 6px;padding-left:8px;padding-right:8px}
   .primary{font-size:10px;gap:3px}
   .primary span{font-size:13px}

@@ -4,22 +4,26 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f4f1eb">
-  <meta name="description" content="3Dの腕に黒い線を描いて、上腕・前腕の型紙に展開するタトゥーステンシル作成ツール。">
-  <title>ARM / STENCIL — 腕の3Dステンシル</title>
+  <meta name="description" content="男性・女性の腕、脚、背中に3Dで線を描き、転写用の近似型紙を作るタトゥーステンシル作成ツール。">
+  <title>BODY / STENCIL — 3Dタトゥーステンシル</title>
   <link rel="stylesheet" href="./style.css">
   <script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/controls/OrbitControls.js":"./vendor/OrbitControls.js"}}</script>
   <script type="module" src="./src/app.js"></script>
 </head>
 <body>
   <header class="app-header">
-    <div class="identity"><span class="brand-mark" aria-hidden="true">a/</span><div><h1>ARM <span>/</span> STENCIL</h1><p>腕のためのステンシルスタジオ</p></div></div>
-    <div class="header-meta">描画：肩から手首<span>成人男性・人体スキャン由来</span></div>
-    <!-- app-version:start --><small id="app-version">v4</small><!-- app-version:end -->
+    <div class="identity"><span class="brand-mark" aria-hidden="true">b/</span><div><h1>BODY <span>/</span> STENCIL</h1><p>3Dタトゥーステンシルスタジオ</p></div></div>
+    <div class="model-selectors" aria-label="描画モデル">
+      <label><span>モデル</span><select id="sex-select" aria-label="モデルの性別"><option value="male">男性</option><option value="female">女性</option></select></label>
+      <label><span>部位</span><select id="part-select" aria-label="描画する部位"><option value="arm">腕</option><option value="leg">脚</option><option value="back">背中</option></select></label>
+    </div>
+    <div class="header-meta"><span id="model-label">男性・右腕</span><span>人体スキャン由来</span></div>
+    <!-- app-version:start --><small id="app-version">v5</small><!-- app-version:end -->
   </header>
   <main>
     <div class="toolbar" aria-label="描画ツール">
       <div class="tool-group" aria-label="モード">
-        <button type="button" data-mode="draw" aria-pressed="true" title="黒線を描く (B)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16 12-12 4 4L8 20H4v-4Zm10-10 4 4M4 20l4-1"/></svg><span>描く</span></button>
+        <button type="button" data-mode="draw" aria-pressed="true" title="線を描く (B)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16 12-12 4 4L8 20H4v-4Zm10-10 4 4M4 20l4-1"/></svg><span>描く</span></button>
         <button type="button" data-mode="erase" aria-pressed="false" title="消しゴム (E)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 14 10-10 7 7-10 10H9l-5-5v-2Zm5-5 7 7M11 21h10"/></svg><span>消す</span></button>
         <button type="button" data-mode="view" aria-pressed="false" title="視点を回転 (V)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14-5L3 9m0-6v6h6M4 13a8 8 0 0 0 14 5l3-3m0 6v-6h-6"/></svg><span>視点</span></button>
       </div>
@@ -33,11 +37,16 @@
     </div>
     <div class="workspace" data-active-tab="arm">
       <section id="arm-panel" class="arm-panel" aria-labelledby="arm-heading">
-        <div class="panel-heading"><div><span class="step">01 / DRAW</span><h2 id="arm-heading">腕をキャンバスに。</h2></div><span class="panel-spec">RIGHT ARM / 540 mm</span></div>
-        <div id="viewport" class="viewport" aria-label="腕の3D描画領域" aria-describedby="gesture-help">
-          <div id="loading" class="loading">腕モデルを準備しています…</div>
-          <div class="anatomy-label shoulder-label" aria-hidden="true">肩<span>SHOULDER</span></div>
-          <div class="anatomy-label wrist-label" aria-hidden="true">手首<span>WRIST</span></div>
+        <div class="panel-heading"><div><span class="step">01 / DRAW</span><h2 id="arm-heading">からだをキャンバスに。</h2></div><span id="model-measurement" class="panel-spec">RIGHT ARM / 540 mm</span></div>
+        <div id="viewport" class="viewport" aria-label="身体の3D描画領域" aria-describedby="gesture-help">
+          <div id="loading" class="loading">モデルを準備しています…</div>
+          <div class="color-palette" role="group" aria-label="線の色">
+            <button type="button" class="color-button selected" data-color="#000000" aria-label="黒" aria-pressed="true" title="黒"><span class="color-swatch" style="--swatch:#000000" aria-hidden="true"></span></button>
+            <button type="button" class="color-button" data-color="#52b9e8" aria-label="水色" aria-pressed="false" title="水色"><span class="color-swatch" style="--swatch:#52b9e8" aria-hidden="true"></span></button>
+            <button type="button" class="color-button" data-color="#f28c3a" aria-label="オレンジ" aria-pressed="false" title="オレンジ"><span class="color-swatch" style="--swatch:#f28c3a" aria-hidden="true"></span></button>
+          </div>
+          <div id="shoulder-label" class="anatomy-label shoulder-label" aria-hidden="true">肩<span>SHOULDER</span></div>
+          <div id="wrist-label" class="anatomy-label wrist-label" aria-hidden="true">手首<span>WRIST</span></div>
           <div class="view-controls" aria-label="視点操作">
             <button id="zoom-in" type="button" aria-label="拡大" title="拡大">+</button>
             <button id="zoom-out" type="button" aria-label="縮小" title="縮小">−</button>
@@ -45,18 +54,18 @@
           </div>
           <div class="mode-indicator"><span id="mode-dot"></span><span id="mode-label">描画モード</span></div>
         </div>
-        <div class="canvas-footer"><p id="gesture-help">腕の表面をドラッグして描画。回転するときは「視点」を選択。</p><span>黒線のみ</span></div>
+        <div class="canvas-footer"><p id="gesture-help">表面を1本指でなぞって描画。2本指でドラッグして回転、ピンチで拡大・縮小。</p><span>黒 / 水色 / オレンジ</span></div>
       </section>
       <section id="stencil-panel" class="stencil-panel" aria-labelledby="stencil-heading">
         <div class="panel-heading"><div><span class="step">02 / TRANSFER</span><h2 id="stencil-heading">平面へ、写し取る。</h2></div><span class="paper-label">JPG</span></div>
         <div id="paper-preview" class="paper-preview">
           <div id="empty-state" class="empty-state">
             <svg class="pattern-illustration" viewBox="0 0 220 180" aria-hidden="true"><path d="M20 25h90l-12 126H33Z M131 25h69l-21 126h-26Z"/><path class="pattern-dash" d="M65 25v126m101-126v126M18 105h92m21-39h69"/><path class="pattern-line" d="M56 49c-20 15 24 26 12 43s-9 26 0 38m101-88c-18 11 16 22 0 35s-8 23 3 31"/></svg>
-            <h3>描いた線が、腕の型紙に。</h3>
-            <p>3Dの腕に描いてから<br>「2Dステンシルに変換」を押してください。</p>
-            <div class="pattern-key"><span>上腕</span><span>前腕</span></div>
+            <h3>描いた線を、転写する型紙に。</h3>
+            <p>3Dモデルに描いてから<br>「2Dステンシルに変換」を押してください。</p>
+            <div class="pattern-key"><span>描画</span><span>型紙</span></div>
           </div>
-          <canvas id="stencil-canvas" hidden aria-label="上腕・前腕の2Dステンシル"></canvas>
+          <canvas id="stencil-canvas" hidden aria-label="転写用の2Dステンシル"></canvas>
         </div>
         <div class="export-settings">
           <label><input type="checkbox" id="mirror">左右反転 <span>転写方法に合わせる</span></label>
@@ -64,10 +73,10 @@
         </div>
         <button id="export-jpg" type="button" class="export-button" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg><span id="save-label">JPGを書き出す</span><span class="export-detail">150 dpi</span></button>
         <p id="export-status" class="export-status" role="status" aria-live="polite">線を描くと変換できます。</p>
-        <details class="print-notes"><summary>型紙と印刷について</summary><p>腕の内側を切れ目にし、肘で上腕・前腕に分けた近似型紙です。540 mmはモデルの参考寸法で、実際の腕には個人差があります。手と指は表示用で、描画の対象は肩〜手首です。</p><p>JPGは150 dpi。50 mmの目盛を実測し、紙で仮合わせしてから転写してください。大きな型紙は印刷ソフトで分割印刷し、必要に応じて切り込みを入れます。</p><p>作業内容はこの画面を開いている間だけ保持されます。</p></details>
+        <details class="print-notes"><summary>型紙と印刷について</summary><p id="model-pattern-note">腕の内側を切れ目にし、肘で上腕・前腕に分けた近似型紙です。540 mmはモデルの参考寸法で、実際の腕には個人差があります。手と指は表示用で、描画の対象は肩〜手首です。</p><p>JPGは腕・背中が150 dpi、脚は125 dpi。50 mmの目盛を実測し、紙で仮合わせしてから転写してください。大きな型紙は印刷ソフトで分割印刷し、必要に応じて切り込みを入れます。</p><p>作業内容はこの画面を開いている間だけ保持されます。</p></details>
       </section>
     </div>
-    <footer class="app-footer"><span>3D → 腕の型紙 → 転写</span><span>近似展開 / 上腕 287 mm・前腕 253 mm</span></footer>
+    <footer class="app-footer"><span>3D → 型紙 → 転写</span><span>参考寸法の近似型紙 / 印刷後に仮合わせ</span></footer>
   </main>
   <dialog id="save-image-dialog" aria-labelledby="save-image-heading">
     <div class="save-dialog-header"><h2 id="save-image-heading">写真に保存</h2><button id="close-save-preview" type="button">閉じる</button></div>

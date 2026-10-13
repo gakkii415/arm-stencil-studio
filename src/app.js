@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { ARM } from './arm.js';
+import { DEFAULT_MODEL, getModel } from './models.js';
 import { GLTFLoader } from '../vendor/loaders/GLTFLoader.js';
 import { renderStencil } from './stencil.js';
 import { SurfacePainter } from './paint.js';
 import { withJpegDensity } from './jpeg.js';
 import { isPhotoLibraryDevice, saveImage } from './image-export.js';
 import { MeshBVH, acceleratedRaycast } from '../vendor/three-mesh-bvh.js';
+import { installTouchControls } from './touch-controls.js';
 
 const $ = (id) => document.getElementById(id);
 const viewport = $('viewport');
@@ -17,7 +18,13 @@ const exportButton = $('export-jpg');
 const preview = $('stencil-canvas');
 const ink = document.createElement('canvas');
 ink.width = 2048; ink.height = 4096;
-const painter = new SurfacePainter(ink, { deferred: true });
+let currentModel = DEFAULT_MODEL;
+const painter = new SurfacePainter(ink, { deferred: true, model: currentModel });
+const drawings = new Map();
+let selectedColor = '#000000';
+let modelLoading = true;
+let modelRevision = 0;
+let touchControls, keyLight;
 let mode = 'draw';
 let converted = false;
 let stale = false;
@@ -46,10 +53,11 @@ function setStatus(message, error = false) {
 }
 
 function updateButtons() {
-  undoButton.disabled = !painter.operations.length || exporting;
-  convertButton.disabled = !painter.operations.some((op) => op.mode === 'draw') || exporting;
-  exportButton.disabled = !converted || stale || !preparedFile || preparing || exporting;
+  undoButton.disabled = !painter.operations.length || exporting || modelLoading;
+  convertButton.disabled = !painter.operations.some((op) => op.mode === 'draw') || exporting || modelLoading;
+  exportButton.disabled = !converted || stale || !preparedFile || preparing || exporting || modelLoading;
   for (const id of ['mirror', 'guides']) $(id).disabled = exporting;
+  for (const id of ['sex-select', 'part-select']) $(id).disabled = exporting || modelLoading;
 }
 
 function changed() {
@@ -100,11 +108,11 @@ function flushInput() {
 
 function updateLandmarkLabels() {
   if (!arm) return;
-  for (const [selector, y] of [['.shoulder-label', ARM.shoulderY], ['.wrist-label', ARM.wristY]]) {
+  for (const [selector, y] of [['.shoulder-label', currentModel.topY], ['.wrist-label', currentModel.bottomY]]) {
     const label = viewport.querySelector(selector);
     const point = arm.localToWorld(new THREE.Vector3(0, y, 0)).project(camera);
     const top = (1 - point.y) * viewport.clientHeight / 2;
-    label.hidden = point.z > 1 || top < 8 || top > viewport.clientHeight - 36;
+    label.hidden = point.z > 1 || top < 70 || top > viewport.clientHeight - 36;
     label.style.bottom = 'auto';
     label.style.top = `${top}px`;
   }
@@ -112,11 +120,15 @@ function updateLandmarkLabels() {
 
 function fitCamera() {
   if (!camera || !arm || !viewport.clientHeight || !viewport.clientWidth) return;
+  endStroke();
+  touchControls?.reset();
   const bounds = new THREE.Box3().setFromObject(arm);
   const size = bounds.getSize(new THREE.Vector3());
   bounds.getCenter(viewTarget);
   const distance = Math.max(Math.max(size.y, size.x / camera.aspect) / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) * 1.08 + size.z * 0.35, 640);
-  camera.position.copy(viewTarget).add(new THREE.Vector3(distance * 0.28, distance * 0.04, distance * -0.96));
+  camera.position.copy(viewTarget).add(new THREE.Vector3(distance * 0.28, distance * 0.04, distance * 0.96 * currentModel.cameraFrontZ));
+  controls.minDistance = Math.max(200, Math.max(size.y, size.x) * 0.5);
+  controls.maxDistance = distance * 3;
   controls.target.copy(viewTarget);
   camera.lookAt(viewTarget);
   controls.update();
@@ -141,8 +153,8 @@ function hitAt(event, bounds = drawingBounds) {
   raycaster.setFromCamera(pointer, camera);
   const hit = raycaster.intersectObject(arm, true)[0];
   if (!hit?.uv || !hit.object.userData.paintable) return null;
-  const y = (1 - hit.uv.y) * ARM.length;
-  if (y < 0 || y > ARM.length) return null;
+  const y = (1 - hit.uv.y) * currentModel.length;
+  if (y < 0 || y > currentModel.length) return null;
   return { u: hit.uv.x, y };
 }
 
@@ -156,8 +168,19 @@ function endStroke(event) {
   if (painter.end()) changed();
 }
 
+function cancelStroke() {
+  pendingPoints = [];
+  const oldId = pointerId;
+  pointerId = null;
+  drawingBounds = null;
+  if (oldId !== null && renderer.domElement.hasPointerCapture(oldId)) renderer.domElement.releasePointerCapture(oldId);
+  if (painter.cancel()) { textureDirty = true; invalidate(); }
+  updateButtons();
+}
+
 function setMode(next) {
   endStroke();
+  touchControls?.reset();
   mode = next;
   viewport.dataset.mode = mode;
   if (controls) controls.enabled = mode === 'view';
@@ -167,8 +190,8 @@ function setMode(next) {
   $('gesture-help').textContent = mode === 'view'
     ? 'ドラッグで回転。2本指のピンチ、ホイール、＋ / − でズーム。'
     : mode === 'erase'
-      ? '線をなぞって消去。消した操作も「戻す」で取り消せます。'
-      : '腕の表面をドラッグして描画。回転するときは「視点」を選択。';
+      ? '1本指で消去、2本指のドラッグで回転・ピンチでズーム。'
+      : '1本指で描画、2本指のドラッグで回転・ピンチでズーム。';
 }
 
 function showTab(tab) {
@@ -182,7 +205,7 @@ function convert() {
   endStroke();
   try {
     painter.rasterize();
-    const result = renderStencil(ink, { scale: 2, mirror: $('mirror').checked, guides: $('guides').checked });
+    const result = renderStencil(ink, { model: currentModel, scale: 2, mirror: $('mirror').checked, guides: $('guides').checked });
     preview.width = result.width; preview.height = result.height;
     preview.getContext('2d').drawImage(result, 0, 0);
     result.width = 0; result.height = 0;
@@ -208,12 +231,14 @@ async function prepareImage() {
     // Paint the converted preview first, then prepare the file before a Save tap.
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     if (revision !== imageRevision) return;
-    output = renderStencil(ink, { scale: 150 / 25.4, mirror: $('mirror').checked, guides: $('guides').checked });
+    // Long leg templates stay below mobile Safari's canvas pixel limits.
+    const dpi = currentModel.part === 'leg' ? 125 : 150;
+    output = renderStencil(ink, { model: currentModel, scale: dpi / 25.4, mirror: $('mirror').checked, guides: $('guides').checked });
     const blob = await new Promise((resolve) => output.toBlob(resolve, 'image/jpeg', 0.98));
     if (!blob) throw new Error('画像を作成できませんでした。');
-    const bytes = withJpegDensity(new Uint8Array(await blob.arrayBuffer()), 150);
+    const bytes = withJpegDensity(new Uint8Array(await blob.arrayBuffer()), dpi);
     if (revision !== imageRevision) return;
-    preparedFile = new File([bytes], `arm-stencil${$('mirror').checked ? '-mirrored' : ''}.jpg`, { type: 'image/jpeg' });
+    preparedFile = new File([bytes], `stencil-${currentModel.id}${$('mirror').checked ? '-mirrored' : ''}.jpg`, { type: 'image/jpeg' });
     setStatus(photoLibrary ? '「写真に保存」→共有画面の「画像を保存」で写真アプリへ保存できます。' : 'JPG画像を保存できます。');
   } catch (error) {
     if (revision === imageRevision) setStatus(error.message || '画像を準備できませんでした。再変換してください。', true);
@@ -262,12 +287,97 @@ function undo() {
   if (painter.undo()) changed();
 }
 
+function disposeModel(model) {
+  model.traverse((object) => {
+    if (!object.isMesh) return;
+    object.geometry.dispose();
+    for (const material of Array.isArray(object.material) ? object.material : [object.material]) material.dispose();
+  });
+}
+
+function updateModelInfo() {
+  const title = `${currentModel.sexLabel}・${currentModel.label}`;
+  $('model-label').textContent = title;
+  $('model-measurement').textContent = `${title} / ${currentModel.length} mm`;
+  viewport.dataset.model = currentModel.id;
+  viewport.setAttribute('aria-label', `${title}の3D描画領域`);
+  renderer.domElement.setAttribute('aria-label', `${title}の表面に1本指で描画、2本指で視点操作`);
+  const panels = currentModel.panels;
+  $('shoulder-label').textContent = panels[0].startLabel;
+  $('wrist-label').textContent = panels.at(-1).endLabel;
+  $('model-pattern-note').textContent = currentModel.type === 'flat'
+    ? `背中の線画を1枚の平面型紙へ写します。${currentModel.length} mmはモデルの参考長さで、実際の身体には個人差があります。胸・腹側は表示用です。`
+    : `${currentModel.part === 'arm' ? '腕の内側を切れ目にし、肘で上腕・前腕' : '脚の内側を切れ目にし、膝で太もも・すね'}に分けた近似型紙です。${currentModel.length} mmはモデルの参考長さで、実際の身体には個人差があります。${currentModel.part === 'arm' ? '手・指' : '足'}は表示用です。`;
+  preview.setAttribute('aria-label', `${title}の2Dステンシル`);
+  document.querySelector('.export-detail').textContent = `${currentModel.part === 'leg' ? 125 : 150} dpi`;
+}
+
+async function loadModel(nextModel) {
+  const revision = ++modelRevision;
+  endStroke();
+  touchControls?.reset();
+  drawings.set(currentModel.id, painter.operations);
+  modelLoading = true;
+  updateButtons();
+  $('loading').hidden = false;
+  $('loading').classList.remove('error');
+  $('loading').textContent = `${nextModel.sexLabel}・${nextModel.label}を読み込んでいます…`;
+  let nextArm;
+  try {
+    const gltf = await new GLTFLoader().loadAsync(nextModel.modelUrl);
+    nextArm = gltf.scene;
+    if (revision !== modelRevision) { disposeModel(nextArm); return; }
+    nextArm.traverse((object) => {
+      if (!object.isMesh) return;
+      object.geometry.boundsTree = new MeshBVH(object.geometry, { indirect: true });
+      object.raycast = acceleratedRaycast;
+      const paintable = object.userData.paintable === true || object.name.startsWith('paintable');
+      object.userData.paintable = paintable;
+      // The shared texture survives disposal of a previously selected mesh.
+      const original = object.material;
+      object.material = new THREE.MeshStandardMaterial({ color: 0xdfc1a0, map: paintable ? texture : null, roughness: 0.82 });
+      for (const material of Array.isArray(original) ? original : [original]) material.dispose();
+    });
+    if (arm) { scene.remove(arm); disposeModel(arm); }
+    arm = nextArm;
+    arm.rotation.z = nextModel.part === 'arm' ? -0.06 : 0;
+    currentModel = nextModel;
+    painter.setModel(currentModel, drawings.get(currentModel.id) || []);
+    scene.add(arm);
+    keyLight.position.z = 500 * currentModel.cameraFrontZ;
+    converted = false;
+    stale = false;
+    preview.hidden = true;
+    $('empty-state').hidden = false;
+    closeImagePreview();
+    $('save-image-dialog').close();
+    updateModelInfo();
+    labelsDirty = true;
+    resize();
+    fitCamera();
+    $('loading').hidden = true;
+    changed();
+  } catch (error) {
+    if (revision !== modelRevision) return;
+    $('sex-select').value = currentModel.sex;
+    $('part-select').value = currentModel.part;
+    $('loading').hidden = !!arm;
+    if (!arm) {
+      $('loading').textContent = '3Dモデルを読み込めませんでした。通信状態を確認してページを開き直してください。';
+      $('loading').classList.add('error');
+    }
+    setStatus('モデルを読み込めませんでした。部位を選び直して再度お試しください。', true);
+  } finally {
+    if (revision === modelRevision) { modelLoading = false; updateButtons(); }
+  }
+}
+
 async function initialize() {
  try {
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'low-power' });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.domElement.setAttribute('aria-label', 'ドラッグして腕の表面に描画');
+  renderer.domElement.setAttribute('aria-label', '身体の表面に描画');
   viewport.prepend(renderer.domElement);
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(37, 1, 1, 5000);
@@ -284,40 +394,28 @@ async function initialize() {
   texture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 4);
   texture.generateMipmaps = true;
   texture.minFilter = THREE.LinearMipmapLinearFilter;
-  const gltf = await new GLTFLoader().loadAsync(new URL('../assets/right-arm.glb', import.meta.url).href);
-  arm = gltf.scene;
-  arm.traverse((object) => {
-    if (!object.isMesh) return;
-    object.geometry.boundsTree = new MeshBVH(object.geometry, { indirect: true });
-    object.raycast = acceleratedRaycast;
-    const paintable = object.userData.paintable === true || object.name.startsWith('paintable');
-    object.userData.paintable = paintable;
-    object.material = new THREE.MeshStandardMaterial({
-      color: 0xdfc1a0,
-      map: paintable ? texture : null,
-      roughness: 0.82,
-    });
-  });
-  arm.rotation.z = -0.06;
-  scene.add(arm);
   scene.add(new THREE.HemisphereLight(0xffffff, 0x858078, 1.9));
-  const key = new THREE.DirectionalLight(0xffffff, 2.5);
-  key.position.set(300, 450, -500); scene.add(key);
+  keyLight = new THREE.DirectionalLight(0xffffff, 2.5);
+  keyLight.position.set(300, 450, -500); scene.add(keyLight);
   const fill = new THREE.DirectionalLight(0xffeee1, 0.9);
   fill.position.set(-350, -100, 250); scene.add(fill);
-  resize(); fitCamera(); setMode('draw');
   new ResizeObserver(resize).observe(viewport);
-  $('loading').hidden = true;
+  touchControls = installTouchControls({
+    element: renderer.domElement, camera, controls, getMode: () => mode,
+    onGestureStart: ({ cancelStroke: cancel }) => cancel ? cancelStroke() : endStroke(),
+    onChange: () => { labelsDirty = true; invalidate(); },
+  });
+  setMode('draw');
 
   renderer.domElement.addEventListener('pointerdown', (event) => {
-    if (mode === 'view' || event.button !== 0 || pointerId !== null || exporting) return;
+    if (mode === 'view' || event.button !== 0 || pointerId !== null || exporting || modelLoading) return;
     event.preventDefault();
     drawingBounds = renderer.domElement.getBoundingClientRect();
     const point = hitAt(event, drawingBounds);
     if (!point) { drawingBounds = null; return; }
     pointerId = event.pointerId;
     renderer.domElement.setPointerCapture(pointerId);
-    painter.begin(mode, Number($('brush-size').value) * (mode === 'erase' ? 4 : 1));
+    painter.begin(mode, Number($('brush-size').value) * (mode === 'erase' ? 4 : 1), selectedColor);
     painter.add(point);
     changed();
   });
@@ -336,17 +434,31 @@ async function initialize() {
     $('loading').textContent = '3D表示が一時停止しました。復帰を待つか、2DからJPGを書き出してください。';
   });
   renderer.domElement.addEventListener('webglcontextrestored', () => { $('loading').hidden = true; textureDirty = true; invalidate(); });
+  await loadModel(currentModel);
 } catch (error) {
   $('loading').hidden = false;
-  $('loading').textContent = '腕モデルを読み込めませんでした。通信状態を確認し、WebGLに対応したSafariやChromeで開き直してください。';
+  $('loading').textContent = '3D表示を開始できませんでした。WebGLに対応したSafariやChromeで開き直してください。';
   $('loading').classList.add('error');
-  setStatus('腕モデルを読み込めませんでした。ページを開き直してください。', true);
+  setStatus('3D表示を開始できませんでした。ページを開き直してください。', true);
  }
 }
 initialize();
 
 for (const button of document.querySelectorAll('[data-mode]')) button.addEventListener('click', () => setMode(button.dataset.mode));
 for (const button of document.querySelectorAll('[data-tab]')) button.addEventListener('click', () => showTab(button.dataset.tab));
+for (const button of document.querySelectorAll('[data-color]')) button.addEventListener('click', () => {
+  endStroke();
+  selectedColor = button.dataset.color;
+  for (const choice of document.querySelectorAll('[data-color]')) {
+    const selected = choice === button;
+    choice.setAttribute('aria-pressed', String(selected));
+    choice.classList.toggle('selected', selected);
+  }
+});
+for (const id of ['sex-select', 'part-select']) $(id).addEventListener('change', () => {
+  showTab('arm');
+  loadModel(getModel($('sex-select').value, $('part-select').value));
+});
 $('brush-size').addEventListener('input', () => { $('brush-value').textContent = `${Number($('brush-size').value).toFixed(1)} mm`; });
 undoButton.addEventListener('click', undo);
 convertButton.addEventListener('click', convert);

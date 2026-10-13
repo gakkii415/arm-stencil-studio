@@ -350,17 +350,16 @@ Yesの場合、装飾を追加する前に、構成、情報階層、コンテ�
 
 ## Project Direction
 
-- Product / users / primary task: 腕に沿うタトゥー線画を描き、転写用の近似型紙を作る作業ツール。
-- Context: PC、iPhone、iPad。短時間の編集、黒線のみ、標準参考寸法の腕1種類。
+- Product / users / primary task: 身体に沿うタトゥー線画を描き、転写用の近似型紙を作る作業ツール。
+- Context: PC、iPhone、iPad。男性/女性と腕/脚/背中の6モデル、黒/水色/オレンジ、短時間の編集。
 - Reference: three.js editor https://threejs.org/editor/ のDesktop実画面とComputed Stylesを確認。作業領域75.7%、補助領域24.3%、36px上帯、14px Helvetica/Arial、平面、影なし。
 - Borrow: 作業対象を大きく見せる面分割、細い境界、上部への操作集約。低コントラスト、32pxボタン、scene tree、多数の設定は採用しない。
-- Compared structures: 左3D/右型紙の同時表示と、描画→結果の単一画面ステップ方式。Desktopは確認しながら描ける同時表示を採用、狭い画面は3D/2Dタブで作業面を確保。
-- Macrostructure: 左3D約65%、右型紙約35%、上部にツール。宣伝セクションや統計カードは置かない。
-- Typography: システム日本語フォント、本文14–16px、見出し20px、補助12px。操作は44px以上。
-- Color / surface: 暖色紙、墨色本文、薄い境界、操作だけ橙色。主要面は平面、ボタン4–6px角丸、影は型紙の紙面だけ。
-- Signature: 3D腕の黒線が上腕・前腕のテーパー型紙へ対応する作業画面。
-- Responsive: iPhone16で44pxヘッダーと44pxタブ、下部2行ツールへ圧縮し、3D作業面の高さ663pxを確保。100dvhとsafe-areaに対応し、型紙のみ内部スクロール。hover依存なし。
-- Scope: 最小MVPの機能・説明のみ。腕は人体スキャン由来のCC0素材で形状を保持し、寸法は参考設定値。
-
-- Drawing feedback: 指の動きへの追従を優先し、初期線幅2.5mm。保存画像の生成は変換時へ移す。
-- Image save: iPhoneは「写真に保存」の1ボタンからOS共有。未対応時は実画像と長押し案内を表示し、閉じる44px操作を置く。
+- Compared structures: 左3D/右型紙の同時表示と、描画→結果の単一画面ステップ方式。Desktopは同時表示、狭い画面は3D/2Dタブで作業面を確保。
+- Macrostructure: 左3D約65%、右型紙約35%。モデル選択は上帯のnative select、色は作業面内の44pxボタン。宣伝セクションや統計カードは置かない。
+- Typography: システム日本語フォント、本文14–16px、見出し20px、補助12px。native select16pxでiOSの入力時拡大を避ける。操作44px以上。
+- Color / surface: 暖色紙、墨色本文、薄い境界、操作は橙色。図案色は黒・水色・オレンジ。選択色は外周と中央印、aria-pressedで示す。主要面は平面、ボタン4–6px角丸、影は型紙の紙面だけ。
+- Signature: 人体スキャンの形に描いた図案が、部位に応じた巻きつけ/平面型紙へ対応する作業画面。
+- Responsive: iPhone16で44pxヘッダーと44pxタブ、下部2行ツール、3D作業面の高さ663px。100dvhとsafe-area対応、型紙のみ内部スクロール。追加操作のために描画面を縮めない。hover依存なし。
+- Scope: 最小限の機能・説明。人体スキャン由来のCC0素材で形状を保持し、寸法は参考設定値。
+- Drawing feedback: 指の動きへの追従を優先し、初期線幅2.5mm。1本指で描画、2本指で回転・ピンチ。2本指後に残る1本指は全指を離すまで描画へ戻さない。保存画像生成は変換時。
+- Image save: iPhoneは「写真に保存」の1ボタンからOS共有。未対応時は実画像と長押し案内、44px閉じる操作。
