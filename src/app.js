@@ -40,10 +40,16 @@ function updateButtons() {
 
 function changed() {
   textureDirty = true;
+  const hasDrawing = painter.operations.some((op) => op.mode === 'draw');
+  if (!hasDrawing) {
+    converted = false;
+    preview.hidden = true;
+    $('empty-state').hidden = false;
+  }
   stale = converted;
   updateButtons();
   if (stale) setStatus('線画が変わりました。再変換してから書き出してください。');
-  else if (painter.operations.length) setStatus('描いた線を2Dステンシルに変換できます。');
+  else if (hasDrawing) setStatus('描いた線を2Dステンシルに変換できます。');
   else setStatus('線を描くと変換できます。');
   invalidate();
 }
