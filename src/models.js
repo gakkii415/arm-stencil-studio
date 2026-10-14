@@ -1,13 +1,14 @@
 import { modelRecords } from '../assets/model-catalog.js';
 
 const descriptions = {
-  arm: { label: '右腕', endpoints: ['肩', '肘', '手首'], sections: ['上腕', '前腕'], ids: ['upper', 'forearm'] },
-  leg: { label: '右脚', endpoints: ['付け根', '膝', '足首'], sections: ['太もも', 'すね'], ids: ['thigh', 'lower-leg'] },
-  back: { label: '背中', endpoints: ['背中上部', '腰'], sections: ['背中'], ids: ['back'] },
+  arm: { label: '腕', endpoints: ['肩', '肘', '手首'], sections: ['上腕', '前腕'], ids: ['upper', 'forearm'] },
+  leg: { label: '脚', endpoints: ['付け根', '膝', '足首'], sections: ['太もも', 'すね'], ids: ['thigh', 'lower-leg'] },
+  back: { label: '背中（肩を含む）', endpoints: ['肩上部', '腰'], sections: ['背中・肩'], ids: ['back'] },
 };
 
 function createModel({ metadata, circumferences, filename }) {
   const description = descriptions[metadata.part];
+  const side = metadata.part === 'back' ? null : metadata.side ?? (metadata.id.endsWith('-left') ? 'left' : 'right');
   const widthAt = (distanceMm) => {
     if (!Number.isFinite(distanceMm)) throw new TypeError('Model distance must be finite.');
     if (metadata.type === 'flat') return metadata.width;
@@ -28,7 +29,7 @@ function createModel({ metadata, circumferences, filename }) {
   }));
   return Object.freeze({
     id: metadata.id, sex: metadata.sex, sexLabel: metadata.sex === 'male' ? '男性' : '女性',
-    part: metadata.part, label: description.label, type: metadata.type,
+    part: metadata.part, side, label: side ? `${side === 'left' ? '左' : '右'}${description.label}` : description.label, type: metadata.type,
     length: metadata.length, width: metadata.width ?? undefined, split: metadata.split,
     topY: metadata.topY, bottomY: metadata.bottomY,
     shoulderY: metadata.topY, wristY: metadata.bottomY,
@@ -39,6 +40,7 @@ function createModel({ metadata, circumferences, filename }) {
     widthAt, circumferenceAt: widthAt,
     maxCircumference: metadata.type === 'flat' ? metadata.width : Math.max(...circumferences.map((row) => row[1])),
     cameraFrontZ: -1,
+    seamXSign: metadata.type === 'wrap' ? (metadata.insideSeam === '+X' ? 1 : -1) : undefined,
     source: metadata,
     contextLabel: metadata.part === 'arm' ? '手・指・肩の切断面は表示用' : metadata.part === 'leg' ? '足・つま先・付け根の切断面は表示用' : '胸・腹・切断面は表示用',
   });
@@ -53,6 +55,7 @@ export function getModelById(id) {
   return model;
 }
 
-export function getModel(sex = 'male', part = 'arm') {
-  return getModelById(`${sex}-${part}`);
+export function getModel(sex = 'male', part = 'arm', side = 'right') {
+  if (part !== 'back' && side !== 'right' && side !== 'left') throw new RangeError(`Unknown side: ${side}`);
+  return getModelById(`${sex}-${part}${part !== 'back' && side === 'left' ? '-left' : ''}`);
 }

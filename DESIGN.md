@@ -351,11 +351,11 @@ Yesの場合、装飾を追加する前に、構成、情報階層、コンテ�
 ## Project Direction
 
 - Product / users / primary task: 身体に沿うタトゥー線画を描き、転写用の近似型紙を作る作業ツール。
-- Context: PC、iPhone、iPad。男性/女性と腕/脚/背中の6モデル、黒/水色/オレンジ、短時間の編集。
+- Context: PC、iPhone、iPad。男性/女性と右腕/左腕/右脚/左脚/背中・肩の10モデル、黒/水色/オレンジ、短時間の編集。
 - Reference: three.js editor https://threejs.org/editor/ のDesktop実画面とComputed Stylesを確認。作業領域75.7%、補助領域24.3%、36px上帯、14px Helvetica/Arial、平面、影なし。
 - Borrow: 作業対象を大きく見せる面分割、細い境界、上部への操作集約。低コントラスト、32pxボタン、scene tree、多数の設定は採用しない。
 - Compared structures: 左3D/右型紙の同時表示と、描画→結果の単一画面ステップ方式。Desktopは同時表示、狭い画面は3D/2Dタブで作業面を確保。
-- Macrostructure: 左3D約65%、右型紙約35%。モデル選択は上帯のnative select、色は作業面内の44pxボタン。宣伝セクションや統計カードは置かない。
+- Macrostructure: 左3D約65%、右型紙約35%。モデル選択は上帯のnative select（性別と左右を含む部位）、色は作業面内の44pxボタン。宣伝セクションや統計カードは置かない。
 - Typography: システム日本語フォント、本文14–16px、見出し20px、補助12px。native select16pxでiOSの入力時拡大を避ける。操作44px以上。
 - Color / surface: 暖色紙、墨色本文、薄い境界、操作は橙色。図案色は黒・水色・オレンジ。選択色は外周と中央印、aria-pressedで示す。主要面は平面、ボタン4–6px角丸、影は型紙の紙面だけ。
 - Signature: 人体スキャンの形に描いた図案が、部位に応じた巻きつけ/平面型紙へ対応する作業画面。

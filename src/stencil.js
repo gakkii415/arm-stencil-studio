@@ -101,10 +101,17 @@ function drawArtwork(context, texture, panel, model, scale, mirror) {
       panel.x * scale, panel.y * scale, panel.width * scale, panel.height * scale,
     );
   } else {
-    const rows = Math.ceil(panel.height * scale);
+    // GPU canvases antialias fractional one-pixel destination rows separately,
+    // mixing solid ink with white at every row boundary. Keep full rows on the
+    // pixel grid and preserve the original physical lower edge in the last row.
+    const outputTop = Math.round(panel.y * scale);
+    const outputBottom = (panel.y + panel.height) * scale;
+    const outputHeight = outputBottom - outputTop;
+    const rows = Math.ceil(outputHeight);
     for (let row = 0; row < rows; row += 1) {
-      const localStart = row / scale;
-      const localEnd = Math.min(panel.height, (row + 1) / scale);
+      const rowEnd = Math.min(outputHeight, row + 1);
+      const localStart = row / outputHeight * panel.height;
+      const localEnd = rowEnd / outputHeight * panel.height;
       const distance = panel.startMm + (localStart + localEnd) / 2;
       const width = widthAt(model, distance);
       const left = panel.centerX - width / 2;
@@ -112,8 +119,8 @@ function drawArtwork(context, texture, panel, model, scale, mirror) {
       const sourceHeight = ((localEnd - localStart) / model.length) * texture.height;
       context.drawImage(
         texture, 0, sourceY, texture.width, sourceHeight,
-        left * scale, (panel.y + localStart) * scale,
-        width * scale, (localEnd - localStart) * scale,
+        left * scale, outputTop + row,
+        width * scale, rowEnd - row,
       );
     }
   }

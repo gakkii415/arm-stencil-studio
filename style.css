@@ -12,7 +12,7 @@ select:focus-visible{outline:3px solid #cf754b;outline-offset:3px}
 .model-selectors label{display:flex;align-items:center;gap:7px}
 .model-selectors label>span{font-size:11px;color:var(--muted);white-space:nowrap}
 #sex-select{width:84px}
-#part-select{width:84px}
+#part-select{width:114px}
 .header-meta{margin-left:0}
 .header-meta #model-label{color:var(--ink);font-size:12px;margin-top:0}
 .color-palette{position:absolute;z-index:2;left:32px;top:12px;display:flex;background:var(--white);outline:1px solid var(--line);border-radius:5px}
@@ -36,7 +36,7 @@ input[type=range]{height:44px;margin-top:0}
   .model-selectors label>span{display:none}
   .model-selectors select{height:44px;font-size:16px;padding:0 7px;background:transparent;border:0;border-radius:0}
   #sex-select{width:74px}
-  #part-select{width:74px}
+  #part-select{width:100px}
   #app-version{flex-shrink:0;margin-left:0;padding-left:8px;font-size:10px}
   main{flex:1;min-height:0;display:grid;grid-template-rows:44px minmax(0,1fr) auto}
   .mobile-tabs{grid-row:1;display:flex;min-width:0;border-bottom:1px solid var(--line);background:#ebe7de}

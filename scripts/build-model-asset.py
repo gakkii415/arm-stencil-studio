@@ -9,6 +9,7 @@ and a context-only cap are applied. No radial reconstruction deforms the scan.
 import array
 import bpy
 import collections
+import hashlib
 import json
 import math
 import pathlib
@@ -21,8 +22,12 @@ ARGS = sys.argv[sys.argv.index('--') + 1:]
 SOURCE = pathlib.Path(ARGS[0])
 LANDMARKS = json.loads(pathlib.Path(ARGS[1]).read_text())
 MODEL_ID = ARGS[2]
-SEX, PART = MODEL_ID.split('-', 1)
+id_parts = MODEL_ID.split('-')
+SEX, PART = id_parts[:2]
+SIDE = LANDMARKS.get('side', 'left' if MODEL_ID.endswith('-left') else ('right' if PART in {'arm', 'leg'} else None))
+SEAM_X_SIGN = 1 if LANDMARKS.get('inside') == '-X' else -1
 FLAT = PART in {'back', 'chest', 'abdomen'}
+STRICT_POSTERIOR = PART == 'back' and 'anterior_source_y_paintable_faces' in LANDMARKS
 LENGTH = LANDMARKS.get('target_length_mm', 550 if FLAT else (800 if PART == 'leg' else 540))
 REFERENCE_LENGTH = LANDMARKS.get('reference_length_m', LANDMARKS.get('source_shoulder_wrist_length_m'))
 vertical_landmarks = LANDMARKS['vertical_coordinates']
@@ -30,18 +35,23 @@ source_top = vertical_landmarks.get('top', vertical_landmarks.get('shoulder'))
 source_bottom = vertical_landmarks.get('bottom', vertical_landmarks.get('wrist'))
 SOURCE_CENTER_Y = (source_top[1] + source_bottom[1]) / 2
 SCALE = LENGTH / (source_top[1] - source_bottom[1])
+POSTERIOR_Z_BOUND = LANDMARKS.get('source_origin_subtracted', [0, 0, 0])[1] * SCALE
 TOP = LENGTH / 2
 BOTTOM = -TOP
 PAINT_SETS = set(LANDMARKS.get('paint_face_sets', [20, 11, 10] if PART == 'arm' else []))
-if PART == 'arm':
+joint_sets = LANDMARKS.get('joint_face_sets', [LANDMARKS['joint_face_set']] if 'joint_face_set' in LANDMARKS else [])
+if joint_sets:
+    PAINT_SETS.update(joint_sets)
+elif PART == 'arm' and SIDE == 'right':
     PAINT_SETS.add(10)  # tilted wrist border, above the horizontal wrist only
-elif PART == 'leg':
+elif PART == 'leg' and SIDE == 'right':
     PAINT_SETS.add(13)  # tilted ankle border, above the horizontal ankle only
 PROFILE_STEP = 5
 
 bpy.ops.wm.open_mainfile(filepath=str(SOURCE))
 obj = next(o for o in bpy.data.objects if o.type == 'MESH')
 mesh = obj.data
+SOURCE_VERTEX_COUNT = len(mesh.vertices)
 mesh.calc_loop_triangles()
 sets = mesh.attributes['.sculpt_face_set']
 paint_mask = mesh.attributes.get(LANDMARKS.get('paint_face_attribute', 'stencil_paintable'))
@@ -191,11 +201,11 @@ def cross_section(y):
         if (a[1] <= cz < b[1]) or (b[1] <= cz < a[1]):
             fraction = (cz - a[1]) / (b[1] - a[1])
             x = a[0] + fraction * (b[0] - a[0])
-            if x < cx:
-                seam_candidates.append((x, index, (x, cz)))
+            if (x - cx) * SEAM_X_SIGN > 0:
+                seam_candidates.append((x * SEAM_X_SIGN, index, (x, cz)))
     if not seam_candidates:
         raise RuntimeError('No body-facing contour seam.')
-    _, seam_index, seam = min(seam_candidates)
+    _, seam_index, seam = max(seam_candidates)
     knots = [seam] + [contour[(seam_index + 1 + i) % len(contour)] for i in range(len(contour))] + [seam]
     lengths = [0.0]
     for i in range(1, len(knots)):
@@ -212,6 +222,10 @@ if FLAT:
         if face_set == -1 or not allowed_triangles.get(tuple(indices), False):
             continue
         vertices = [positions[i] for i in indices]
+        if (vertices[1] - vertices[0]).cross(vertices[2] - vertices[0]).z >= 0:
+            continue
+        if STRICT_POSTERIOR and sum(p.z for p in vertices) / 3 >= POSTERIOR_Z_BOUND:
+            continue
         for bound, keep_lower in [(TOP, True), (BOTTOM, False)]:
             clipped = []
             for i, a in enumerate(vertices):
@@ -290,6 +304,7 @@ def clip(polygon, coordinate, bound, keep_lower):
     return result
 
 groups = {'paintable': [], 'context': []}
+shoulder_paint_triangles = collections.Counter()
 def append_polygon(group, polygon):
     for i in range(1, len(polygon) - 1):
         triangle = [polygon[0], polygon[i], polygon[i + 1]]
@@ -307,6 +322,12 @@ for indices, face_set in base_triangles:
     # The original wrist face-set border is tilted. Its hand-base faces above
     # the horizontal wrist landmark are still wrist, not the displayed hand.
     surface_allowed = face_set != -1 and (allowed_triangles.get(tuple(indices), False) if FLAT else face_set in PAINT_SETS)
+    if FLAT and surface_allowed:
+        # A posterior quad can triangulate into a tiny forward-facing facet.
+        # Keep that original facet as context rather than folding planar UVs.
+        surface_allowed = (triangle[1]['p'] - triangle[0]['p']).cross(triangle[2]['p'] - triangle[0]['p']).z < 0
+        if STRICT_POSTERIOR:
+            surface_allowed = surface_allowed and sum(v['p'].z for v in triangle) / 3 < POSTERIOR_Z_BOUND
     if not surface_allowed:
         if face_set == -1:
             face_normal = (triangle[1]['p'] - triangle[0]['p']).cross(triangle[2]['p'] - triangle[0]['p']).normalized()
@@ -314,6 +335,7 @@ for indices, face_set in base_triangles:
                 vertex['n'] = face_normal
         append_polygon('context', triangle)
         continue
+    shoulder_start_count = len(groups['paintable'])
     append_polygon('context', clip(triangle, lambda v: v['p'].y, TOP, False))
     append_polygon('context', clip(triangle, lambda v: v['p'].y, BOTTOM, True))
     polygon = clip(clip(triangle, lambda v: v['p'].y, TOP, True), lambda v: v['p'].y, BOTTOM, False)
@@ -331,6 +353,8 @@ for indices, face_set in base_triangles:
         append_polygon('paintable', after)
     else:
         append_polygon('paintable', polygon)
+    if FLAT and face_set in {20, 21}:
+        shoulder_paint_triangles[str(face_set)] += len(groups['paintable']) - shoulder_start_count
 
 binary = bytearray()
 views = []
@@ -356,6 +380,7 @@ def add_accessor(values, kind, component_type, target):
 
 gltf_meshes = []
 statistics = {}
+shipped_positions = set()
 for name, triangles in groups.items():
     lookup = {}
     pos = []
@@ -378,11 +403,13 @@ for name, triangles in groups.items():
                  'indices': add_accessor(indices, 'SCALAR', 5125, 34963), 'material': 0 if name == 'paintable' else 1, 'mode': 4}
     gltf_meshes.append({'name': name, 'primitives': [primitive]})
     statistics[name] = {'vertices': len(pos) // 3, 'triangles': len(indices) // 3}
+    shipped_positions.update(tuple(round(pos[i + axis], 4) for axis in range(3)) for i in range(0, len(pos), 3))
 
 provenance = {'author': LANDMARKS['author'], 'license': LANDMARKS['license'], 'source': LANDMARKS['source_url'],
               'sourceObject': LANDMARKS.get('source_object', f'GEO-body_{SEX}_realistic'), 'multiresolutionLevel': 2,
               'processing': 'Rigid rotation/translation, uniform scale, context boundary caps, paint and UV triangle split; original scan surface retained.',
-              'units': 'mm', 'front': '-Z', 'insideSeam': '-X'}
+              'units': 'mm', 'front': '-Z', 'insideSeam': None if FLAT else ('+X' if SEAM_X_SIGN > 0 else '-X'),
+              'part': PART, 'side': SIDE, 'sideOrigin': 'original', 'isMirrored': False}
 gltf = {'asset': {'version': '2.0', 'generator': 'Arm stencil scan-preserving asset builder', 'extras': provenance},
         'scene': 0, 'scenes': [{'nodes': [0, 1]}],
         'nodes': [{'name': name, 'mesh': i, 'extras': {'paintable': name == 'paintable'}} for i, name in enumerate(groups)],
@@ -399,16 +426,34 @@ length = 12 + 8 + len(json_bytes) + 8 + len(binary)
 glb = struct.pack('<4sII', b'glTF', 2, length) + struct.pack('<I4s', len(json_bytes), b'JSON') + json_bytes + struct.pack('<I4s', len(binary), b'BIN\0') + binary
 assets = ROOT / 'assets'
 assets.mkdir(exist_ok=True)
-(assets / f'{MODEL_ID}.glb').write_bytes(glb)
 split_position = LANDMARKS['vertical_coordinates'].get('split')
 split_distance = None if FLAT or split_position is None else round(TOP - (split_position[1] - SOURCE_CENTER_Y) * SCALE)
 profile_values = [[round(p['distance'], 3), round(p['circumference'], 1)] for p in profiles]
+preserved_source_vertices = sum(tuple(round(float(value), 4) for value in position) in shipped_positions for position in positions[:SOURCE_VERTEX_COUNT])
+if preserved_source_vertices != SOURCE_VERTEX_COUNT:
+    raise RuntimeError('A source scan vertex was lost during asset processing.')
+shoulder_landmarks = LANDMARKS.get('shoulder_landmarks', {})
+shoulder_landmarks_mm = {}
+for key, point in shoulder_landmarks.items():
+    if isinstance(point, dict):
+        point = point['vertical_m']
+    transformed = converted(point)
+    if FLAT:
+        transformed.x -= FLAT_CENTER_X
+    shoulder_landmarks_mm[key] = list(transformed)
 metadata = {'id': MODEL_ID, 'sex': SEX, 'part': PART, 'type': 'flat' if FLAT else 'wrap',
             'length': LENGTH, 'split': split_distance, 'topY': TOP, 'bottomY': BOTTOM,
             'width': FLAT_WIDTH if FLAT else None, 'sourceHorizontalTranslationMm': -FLAT_CENTER_X if FLAT else 0,
             'sourceSplitDistanceMm': None if split_position is None else TOP - (split_position[1] - SOURCE_CENTER_Y) * SCALE,
             'sourceVerticalTranslationBeforeScaleM': -SOURCE_CENTER_Y,
+            'sourceRawSha256': hashlib.sha256(SOURCE.read_bytes()).hexdigest(),
+            'sourceVertexCount': SOURCE_VERTEX_COUNT, 'preservedSourceVertexCount': preserved_source_vertices,
+            'shoulderLandmarksMm': shoulder_landmarks_mm,
+            'shoulderPaintTriangles': dict(shoulder_paint_triangles),
+            'strictPosteriorOnly': STRICT_POSTERIOR, 'posteriorZBoundMm': POSTERIOR_Z_BOUND if STRICT_POSTERIOR else None,
+            'anteriorSourceYPaintableFaces': LANDMARKS.get('anterior_source_y_paintable_faces'),
             'profileStepMm': PROFILE_STEP, 'sourceScaleMmPerMeter': SCALE, **provenance, 'statistics': statistics}
+(assets / f'{MODEL_ID}.glb').write_bytes(glb)
 (assets / f'{MODEL_ID}-profile.js').write_text('// Generated from the original CC0 scan surface.\n'
     + 'export const modelMetadata = Object.freeze(' + json.dumps(metadata, ensure_ascii=False, indent=2) + ');\n'
     + 'export const modelCircumferences = ' + json.dumps(profile_values, separators=(',', ':')) + ';\n')

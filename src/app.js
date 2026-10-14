@@ -126,7 +126,8 @@ function fitCamera() {
   const size = bounds.getSize(new THREE.Vector3());
   bounds.getCenter(viewTarget);
   const distance = Math.max(Math.max(size.y, size.x / camera.aspect) / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) * 1.08 + size.z * 0.35, 640);
-  camera.position.copy(viewTarget).add(new THREE.Vector3(distance * 0.28, distance * 0.04, distance * 0.96 * currentModel.cameraFrontZ));
+  const sideDirection = currentModel.side === 'left' ? -1 : 1;
+  camera.position.copy(viewTarget).add(new THREE.Vector3(distance * 0.28 * sideDirection, distance * 0.04, distance * 0.96 * currentModel.cameraFrontZ));
   controls.minDistance = Math.max(200, Math.max(size.y, size.x) * 0.5);
   controls.maxDistance = distance * 3;
   controls.target.copy(viewTarget);
@@ -306,7 +307,7 @@ function updateModelInfo() {
   $('shoulder-label').textContent = panels[0].startLabel;
   $('wrist-label').textContent = panels.at(-1).endLabel;
   $('model-pattern-note').textContent = currentModel.type === 'flat'
-    ? `背中の線画を1枚の平面型紙へ写します。${currentModel.length} mmはモデルの参考長さで、実際の身体には個人差があります。胸・腹側は表示用です。`
+    ? `両肩の後面を含む背中の線画を1枚の平面型紙へ写します。${currentModel.length} mmはモデルの参考長さで、実際の身体には個人差があります。トルソーの胸・腹側、首元と切断面は表示用です。`
     : `${currentModel.part === 'arm' ? '腕の内側を切れ目にし、肘で上腕・前腕' : '脚の内側を切れ目にし、膝で太もも・すね'}に分けた近似型紙です。${currentModel.length} mmはモデルの参考長さで、実際の身体には個人差があります。${currentModel.part === 'arm' ? '手・指' : '足'}は表示用です。`;
   preview.setAttribute('aria-label', `${title}の2Dステンシル`);
   document.querySelector('.export-detail').textContent = `${currentModel.part === 'leg' ? 125 : 150} dpi`;
@@ -340,10 +341,11 @@ async function loadModel(nextModel) {
     });
     if (arm) { scene.remove(arm); disposeModel(arm); }
     arm = nextArm;
-    arm.rotation.z = nextModel.part === 'arm' ? -0.06 : 0;
+    arm.rotation.z = nextModel.part === 'arm' ? (nextModel.side === 'left' ? 0.06 : -0.06) : 0;
     currentModel = nextModel;
     painter.setModel(currentModel, drawings.get(currentModel.id) || []);
     scene.add(arm);
+    keyLight.position.x = currentModel.side === 'left' ? -300 : 300;
     keyLight.position.z = 500 * currentModel.cameraFrontZ;
     converted = false;
     stale = false;
@@ -360,7 +362,7 @@ async function loadModel(nextModel) {
   } catch (error) {
     if (revision !== modelRevision) return;
     $('sex-select').value = currentModel.sex;
-    $('part-select').value = currentModel.part;
+    $('part-select').value = currentModel.part + (currentModel.side === 'left' ? '-left' : '');
     $('loading').hidden = !!arm;
     if (!arm) {
       $('loading').textContent = '3Dモデルを読み込めませんでした。通信状態を確認してページを開き直してください。';
@@ -457,7 +459,8 @@ for (const button of document.querySelectorAll('[data-color]')) button.addEventL
 });
 for (const id of ['sex-select', 'part-select']) $(id).addEventListener('change', () => {
   showTab('arm');
-  loadModel(getModel($('sex-select').value, $('part-select').value));
+  const [part, side = 'right'] = $('part-select').value.split('-');
+  loadModel(getModel($('sex-select').value, part, side));
 });
 $('brush-size').addEventListener('input', () => { $('brush-value').textContent = `${Number($('brush-size').value).toFixed(1)} mm`; });
 undoButton.addEventListener('click', undo);

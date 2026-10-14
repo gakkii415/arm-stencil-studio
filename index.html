@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f4f1eb">
-  <meta name="description" content="男性・女性の腕、脚、背中に3Dで線を描き、転写用の近似型紙を作るタトゥーステンシル作成ツール。">
-  <title>BODY / STENCIL — 3Dタトゥーステンシル</title>
+  <meta name="description" content="男性・女性の左右の腕、左右の脚、肩を含む背中（トルソー）に3Dで線を描き、転写用の近似型紙を作るタトゥーステンシル作成ツール。">
+  <title>BODY / STENCIL — 左右の腕・脚・トルソーの3Dタトゥーステンシル</title>
   <link rel="stylesheet" href="./style.css">
   <script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/controls/OrbitControls.js":"./vendor/OrbitControls.js"}}</script>
   <script type="module" src="./src/app.js"></script>
@@ -15,10 +15,10 @@
     <div class="identity"><span class="brand-mark" aria-hidden="true">b/</span><div><h1>BODY <span>/</span> STENCIL</h1><p>3Dタトゥーステンシルスタジオ</p></div></div>
     <div class="model-selectors" aria-label="描画モデル">
       <label><span>モデル</span><select id="sex-select" aria-label="モデルの性別"><option value="male">男性</option><option value="female">女性</option></select></label>
-      <label><span>部位</span><select id="part-select" aria-label="描画する部位"><option value="arm">腕</option><option value="leg">脚</option><option value="back">背中</option></select></label>
+      <label><span>部位</span><select id="part-select" aria-label="描画する部位"><option value="arm">右腕</option><option value="arm-left">左腕</option><option value="leg">右脚</option><option value="leg-left">左脚</option><option value="back" title="背中・肩（トルソー）">背中・肩</option></select></label>
     </div>
     <div class="header-meta"><span id="model-label">男性・右腕</span><span>人体スキャン由来</span></div>
-    <!-- app-version:start --><small id="app-version">v5</small><!-- app-version:end -->
+    <!-- app-version:start --><small id="app-version">v6</small><!-- app-version:end -->
   </header>
   <main>
     <div class="toolbar" aria-label="描画ツール">

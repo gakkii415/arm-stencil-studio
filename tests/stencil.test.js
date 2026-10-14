@@ -245,37 +245,52 @@ function uvSliceSegments(y, meshList) {
   return segments.sort((a, b) => a[0].u - b[0].u);
 }
 
-test('the catalog resolves all six distinct sex/body-part selections and preserves the default arm', () => {
-  assert.equal(MODEL_CATALOG.length, 6);
-  assert.equal(new Set(MODEL_CATALOG.map((model) => model.id)).size, 6);
-  assert.equal(new Set(MODEL_CATALOG.map((model) => model.modelUrl)).size, 6);
+test('the catalog resolves all ten distinct sex/body-part/side selections and preserves the default arm', () => {
+  assert.equal(MODEL_CATALOG.length, 10);
+  assert.equal(new Set(MODEL_CATALOG.map((model) => model.id)).size, 10);
+  assert.equal(new Set(MODEL_CATALOG.map((model) => model.modelUrl)).size, 10);
   assert.equal(DEFAULT_MODEL, getModel());
   assert.equal(DEFAULT_MODEL.id, 'male-arm');
   assert.equal(DEFAULT_MODEL.modelUrl, ARM_MODEL_URL);
   assert.equal(DEFAULT_MODEL.length, ARM.length);
   for (const sex of ['male', 'female']) {
     for (const part of ['arm', 'leg', 'back']) {
-      const model = getModel(sex, part);
-      assert.equal(model.id, `${sex}-${part}`);
-      assert.equal(model.sex, sex);
-      assert.equal(model.part, part);
-      assert.equal(getModelById(model.id), model);
-      assert.ok(MODEL_CATALOG.includes(model));
-      assert.ok(model.label && model.sexLabel);
-      assert.equal(model.type, part === 'back' ? 'flat' : 'wrap');
-      assert.ok(Number.isFinite(model.length) && model.length > 0);
-      near(model.topY - model.bottomY, model.length);
-      assert.ok(Number.isFinite(model.cameraFrontZ) && model.cameraFrontZ !== 0);
-      assert.ok(model.landmarks.every(({ label, distance }) => label && distance >= 0 && distance <= model.length));
-      assert.equal(model.source.license, 'CC0-1.0');
-      assert.ok(model.source.sourceObject && model.source.source);
-      if (model.type === 'wrap') assert.ok(model.split > 0 && model.split < model.length);
-      else assert.equal(model.split, null);
+      for (const side of part === 'back' ? [null] : ['right', 'left']) {
+        const model = getModel(sex, part, side ?? 'right');
+        assert.equal(model.id, `${sex}-${part}${side === 'left' ? '-left' : ''}`);
+        assert.equal(model.sex, sex);
+        assert.equal(model.part, part);
+        assert.equal(model.side, side);
+        assert.equal(model.source.part, part);
+        assert.equal(model.source.side, side);
+        assert.equal(getModelById(model.id), model);
+        assert.ok(MODEL_CATALOG.includes(model));
+        assert.ok(model.label && model.sexLabel);
+        if (side !== null) assert.ok(model.label.startsWith(side === 'left' ? '左' : '右'), 'the visible part label identifies the anatomical side');
+        assert.equal(model.type, part === 'back' ? 'flat' : 'wrap');
+        assert.ok(Number.isFinite(model.length) && model.length > 0);
+        near(model.topY - model.bottomY, model.length);
+        assert.ok(Number.isFinite(model.cameraFrontZ) && model.cameraFrontZ !== 0);
+        assert.ok(model.landmarks.every(({ label, distance }) => label && distance >= 0 && distance <= model.length));
+        assert.equal(model.source.license, 'CC0-1.0');
+        assert.ok(model.source.sourceObject && model.source.source);
+        if (model.type === 'wrap') {
+          assert.ok(model.split > 0 && model.split < model.length);
+          assert.equal(model.seamXSign, side === 'left' ? 1 : -1);
+          assert.equal(model.source.insideSeam, side === 'left' ? '+X' : '-X');
+          if (side === 'right') assert.equal(getModel(sex, part), model, 'omitting side preserves the original right selection');
+        } else {
+          assert.equal(model.split, null);
+          assert.equal(getModel(sex, part), model);
+          assert.equal(getModel(sex, part, 'left'), model, 'back has one drawing regardless of the limb-side selector');
+        }
+      }
     }
   }
   assert.throws(() => getModelById('unknown-model'), RangeError);
   assert.throws(() => getModel('unknown-sex', 'arm'), RangeError);
   assert.throws(() => getModel('male', 'unknown-part'), RangeError);
+  assert.throws(() => getModel('male', 'arm', 'unknown-side'), RangeError);
 });
 
 for (const model of MODEL_CATALOG) {
@@ -286,6 +301,17 @@ for (const model of MODEL_CATALOG) {
     assert.ok(drawable.length > 0 && context.length > 0, 'each model separates the drawing surface from displayed context');
     assert.equal(document.asset.extras.license, model.source.license);
     assert.equal(document.asset.extras.sourceObject, model.source.sourceObject);
+    if (model.side === 'left') {
+      assert.equal(document.asset.extras.part, model.part);
+      assert.equal(document.asset.extras.side, 'left');
+      assert.equal(document.asset.extras.sideOrigin, 'original');
+      assert.equal(document.asset.extras.isMirrored, false);
+      assert.equal(model.source.sideOrigin, 'original');
+      assert.equal(model.source.isMirrored, false);
+      assert.match(model.source.sourceRawSha256, /^[a-f0-9]{64}$/, 'left provenance identifies the original extracted source file');
+      assert.ok(Number.isInteger(model.source.sourceVertexCount) && model.source.sourceVertexCount > 1000);
+      assert.equal(model.source.preservedSourceVertexCount, model.source.sourceVertexCount, 'every original left-side source vertex survives the rigid conversion');
+    }
     assert.ok(drawable.reduce((count, mesh) => count + mesh.indices.length / 3, 0) > 1000, 'the drawing surface retains detailed source geometry');
     const positions = drawable.flatMap((mesh) => mesh.positions);
     const [bottom, top] = coordinateRange(positions, 1);
@@ -393,7 +419,7 @@ for (const model of MODEL_CATALOG) {
     assert.equal(left.size, right.size);
     for (const [key, p] of left) {
       assert.ok(right.has(key), 'both stencil edges coincide on the original surface');
-      assert.ok(p[0] < 0, 'the seam stays on the inward negative X side');
+      assert.ok(p[0] * model.seamXSign > 0, `${model.id} seam stays on its anatomical inner X side`);
     }
   });
 
@@ -432,18 +458,98 @@ for (const model of MODEL_CATALOG) {
 
 test('male and female selections use independently sourced, distinct geometry for every body part', () => {
   for (const part of ['arm', 'leg', 'back']) {
-    const male = getModel('male', part), female = getModel('female', part);
-    assert.notEqual(male.source.sourceObject, female.source.sourceObject);
-    const fingerprint = (model) => {
-      const drawable = assetFor(model).meshes.filter((mesh) => mesh.paintable);
-      return createHash('sha256').update(JSON.stringify(drawable.map((mesh) => mesh.positions))).digest('hex');
-    };
-    assert.notEqual(fingerprint(male), fingerprint(female), `${part} must not reuse the same displayed model`);
-    const proportionsDiffer = [0.2, 0.5, 0.8].some((fraction) =>
-      Math.abs(male.widthAt(male.length * fraction) / male.length - female.widthAt(female.length * fraction) / female.length) > 0.005);
-    assert.ok(proportionsDiffer, `${part} has distinct scan proportions after accounting for physical length`);
+    for (const side of part === 'back' ? ['right'] : ['right', 'left']) {
+      const male = getModel('male', part, side), female = getModel('female', part, side);
+      assert.notEqual(male.source.sourceObject, female.source.sourceObject);
+      const fingerprint = (model) => {
+        const drawable = assetFor(model).meshes.filter((mesh) => mesh.paintable);
+        return createHash('sha256').update(JSON.stringify(drawable.map((mesh) => mesh.positions))).digest('hex');
+      };
+      assert.notEqual(fingerprint(male), fingerprint(female), `${part}/${side} must not reuse the same displayed model`);
+      const proportionsDiffer = [0.2, 0.5, 0.8].some((fraction) =>
+        Math.abs(male.widthAt(male.length * fraction) / male.length - female.widthAt(female.length * fraction) / female.length) > 0.005);
+      assert.ok(proportionsDiffer, `${part}/${side} has distinct scan proportions after accounting for physical length`);
+    }
   }
 });
+
+function surfaceFingerprint(model, reflectX = false) {
+  // Ignore vertex order and UV-seam duplicates, so changing indices or texture
+  // coordinates cannot turn a reflected right mesh into an original left mesh.
+  const points = new Set(assetFor(model).meshes.flatMap((mesh) => mesh.positions).map((point) =>
+    point.map((value, axis) => Math.round(value * (axis === 0 && reflectX ? -1 : 1) * 1000)).join(',')));
+  return createHash('sha256').update([...points].sort().join('\n')).digest('hex');
+}
+
+for (const sex of ['male', 'female']) {
+  for (const part of ['arm', 'leg']) {
+    test(`${sex}-${part}: the original left scan is distinct from the right scan and its synthetic reflection`, () => {
+      const right = getModel(sex, part, 'right'), left = getModel(sex, part, 'left');
+      assert.notEqual(right.id, left.id);
+      assert.notEqual(right.modelUrl, left.modelUrl);
+      assert.equal(left.source.side, 'left');
+      assert.equal(left.source.part, part);
+      assert.equal(left.source.sideOrigin, 'original');
+      assert.equal(left.source.isMirrored, false);
+      assert.notEqual(surfaceFingerprint(left), surfaceFingerprint(right), 'left and right retain different original surface positions');
+      assert.notEqual(surfaceFingerprint(left), surfaceFingerprint(right, true), 'left is not produced by reflecting the shipped right surface');
+    });
+  }
+}
+
+const previousBackWidths = { male: 358.7017822265625, female: 336.2050323486328 };
+for (const sex of ['male', 'female']) {
+  test(`${sex}-back: both original posterior shoulders provide paintable surface beyond the earlier back crop`, () => {
+    const model = getModel(sex, 'back');
+    const previousWidth = previousBackWidths[sex];
+    assert.ok(model.width > previousWidth + 10, 'adding the actual shoulder surface expands the physical drawing width');
+    assert.ok(model.source.shoulderPaintTriangles['20'] > 100 && model.source.shoulderPaintTriangles['21'] > 100, 'both original upper-arm shoulder face sets contribute posterior drawing triangles');
+    assert.match(model.source.sourceRawSha256, /^[a-f0-9]{64}$/);
+    assert.equal(model.source.preservedSourceVertexCount, model.source.sourceVertexCount, 'the expanded torso retains every original source vertex');
+    assert.equal(model.source.strictPosteriorOnly, true);
+    assert.equal(model.source.anteriorSourceYPaintableFaces, 0, 'original anterior chest/abdomen faces remain context');
+    near(model.source.posteriorZBoundMm, 0);
+    const shoulderLandmarks = model.source.shoulderLandmarksMm;
+    assert.ok(shoulderLandmarks && shoulderLandmarks.right && shoulderLandmarks.left, 'shoulder positions are derived from the original source anatomy');
+    const drawable = assetFor(model).meshes.filter((mesh) => mesh.paintable === true);
+    for (const mesh of drawable) {
+      for (const indices of triangles(mesh)) {
+        const centerZ = indices.reduce((sum, index) => sum + mesh.positions[index][2], 0) / 3;
+        assert.ok(centerZ < model.source.posteriorZBoundMm + 1e-4,
+          `${model.id} drawable triangle ${indices.join(',')} stays behind the source posterior boundary and cannot place artwork on anterior chest/abdomen folds`);
+      }
+    }
+    for (const side of ['right', 'left']) {
+      const landmark = shoulderLandmarks[side];
+      assert.ok(Array.isArray(landmark) && landmark.length === 3 && landmark.every(Number.isFinite));
+      const sign = Math.sign(landmark[0]);
+      assert.ok(sign !== 0);
+      const points = [];
+      let area = 0, count = 0;
+      for (const mesh of drawable) {
+        for (const indices of triangles(mesh)) {
+          const [a, b, c] = indices.map((index) => mesh.positions[index]);
+          const center = [0, 1, 2].map((axis) => (a[axis] + b[axis] + c[axis]) / 3);
+          if (center[0] * sign <= previousWidth / 2 + 5 || Math.abs(center[1] - landmark[1]) >= model.length * 0.2) continue;
+          const normal = cross(b.map((value, axis) => value - a[axis]), c.map((value, axis) => value - a[axis]));
+          assert.ok(normal[2] < 0, 'shoulder artwork stays on the original posterior surface');
+          area += Math.hypot(...normal) / 2;
+          count += 1;
+          points.push(a, b, c);
+          for (const index of indices) {
+            const p = mesh.positions[index], uv = mesh.uv[index];
+            near(uv[0] * model.width - model.width / 2, p[0], 1e-3);
+            const output = projectStencilPoint(uv[0], model.topY - p[1], { model });
+            near(output.x - output.centerX, p[0], 1e-3);
+          }
+        }
+      }
+      assert.ok(count > 10 && area > 500, `${sex}/${side} shoulder retains a meaningful original drawing patch outside the former back width`);
+      const [minX, maxX] = coordinateRange(points, 0), [minY, maxY] = coordinateRange(points, 1);
+      assert.ok(maxX - minX >= 15 && maxY - minY >= 25, 'the added shoulder patch spans both drawing directions');
+    }
+  });
+}
 
 function captureStencil(model, { mirror = false, scale = 1.25 } = {}) {
   const draws = [], labels = [], fills = [];
@@ -520,3 +626,54 @@ test('rendered flat-back artwork mirrors horizontally while its vertical placeme
     }
   }
 });
+
+for (const dpi of [125, 150]) {
+  test(`${dpi} DPI wrap artwork uses aligned pixel rows while preserving physical bounds and continuous full texture coverage`, () => {
+    const scale = dpi / 25.4;
+    for (const model of MODEL_CATALOG.filter((model) => model.type === 'wrap')) {
+      const layout = stencilDimensions(model);
+      const { draws, texture } = captureStencil(model, { scale });
+      for (const panel of layout.panels) {
+        const panelDraws = draws.filter(({ args }) => {
+          const sourceDistance = args[2] / texture.height * model.length;
+          return sourceDistance >= panel.startMm - 1e-6 && sourceDistance < panel.endMm - 1e-6;
+        });
+        assert.ok(panelDraws.length > 1, `${model.id}/${panel.id} contains output pixel rows`);
+        const yStart = Math.round(panel.y * scale);
+        const yEnd = (panel.y + panel.height) * scale;
+        const renderedExtent = yEnd - yStart;
+        assert.equal(panelDraws.length, Math.ceil(renderedExtent));
+        assert.ok(Math.abs(yStart - panel.y * scale) <= 0.5, 'alignment moves the upper boundary by at most half a pixel');
+        let previousSourceEnd = panel.startMm / model.length * texture.height;
+        let previousOutputEnd = yStart;
+        for (let row = 0; row < panelDraws.length; row += 1) {
+          const { args, state } = panelDraws[row];
+          const [, sourceX, sourceY, sourceWidth, sourceHeight, destX, destY, destWidth, destHeight] = args;
+          const outputY = state.ty + destY * state.sy;
+          const outputHeight = destHeight * state.sy;
+          assert.equal(outputY, yStart + row, 'every row starts on the pixel grid');
+          assert.equal(Number.isInteger(outputY), true);
+          near(outputY, previousOutputEnd, 1e-7);
+          if (row < panelDraws.length - 1) assert.equal(outputHeight, 1, 'full rows occupy exactly one pixel');
+          else assert.ok(outputHeight > 0 && outputHeight <= 1, 'only the final row may have fractional height');
+          near(outputHeight, Math.min(1, yEnd - outputY), 1e-7);
+          assert.equal(sourceX, 0);
+          assert.equal(sourceWidth, texture.width);
+          assert.ok(sourceHeight > 0);
+          near(sourceY, previousSourceEnd, 1e-7);
+          const localStart = row / renderedExtent * panel.height;
+          const localEnd = (row + outputHeight) / renderedExtent * panel.height;
+          near(sourceY, (panel.startMm + localStart) / model.length * texture.height, 1e-7);
+          near(sourceHeight, (localEnd - localStart) / model.length * texture.height, 1e-7);
+          const distance = panel.startMm + (localStart + localEnd) / 2;
+          near(Math.abs(destWidth * state.sx), model.widthAt(distance) * scale, 1e-5);
+          near(state.tx + (destX + destWidth / 2) * state.sx, panel.centerX * scale, 1e-5);
+          previousSourceEnd = sourceY + sourceHeight;
+          previousOutputEnd = outputY + outputHeight;
+        }
+        near(previousOutputEnd, yEnd, 1e-7);
+        near(previousSourceEnd, panel.endMm / model.length * texture.height, 1e-7);
+      }
+    }
+  });
+}

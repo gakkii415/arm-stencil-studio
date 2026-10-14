@@ -49,10 +49,10 @@
 ## Project Content Maturity
 
 - Core content: モデル・色の選択、描画/消去/視点の操作案内、型紙の寸法、印刷の注意、状態/失敗表示。iPhone/iPadは「写真に保存」→「画像を保存」を案内。未対応は実画像の長押し保存。共有完了を写真ライブラリへの保存確認とは表記しない。
-- Quality: 日本語の短い操作説明。性別/部位と型紙タイトル・端部名を一致させる。540/800/500mmは参考モデル値で人体平均とは表記しない。表示用の手・足・胸腹を区別する。
-- Asset: Blender Studio Human Base Meshes v1.4.1 の Body Male/Female - Realisticを採用。作者Dan Ulrich、CC0。Multiresolution level2のscan surfaceから腕・脚・背中を抽出し、縦向き回転と等方スケール。元の立体形状を保持して描画座標と開口部キャップを追加。詳細はassets/SOURCE.md。
+- Quality: 日本語の短い操作説明。性別/左右/部位と型紙タイトル・端部名を一致させる。540/800/500mmは参考モデル値で人体平均とは表記しない。表示用の手・足・胸腹・首元を区別する。
+- Asset: Blender Studio Human Base Meshes v1.4.1 の Body Male/Female - Realisticを採用。作者Dan Ulrich、CC0。Multiresolution level2のscan surfaceから実際の左右腕・左右脚と両肩を含むトルソーを抽出し、縦向き回転と等方スケール。元の立体形状を保持して描画座標と開口部キャップを追加。詳細はassets/SOURCE.md。
 - Source: https://www.blender.org/download/demo-files/ 。配布ZIP https://download.blender.org/demo/asset-bundles/human-base-meshes/human-base-meshes-bundle-v1.4.1.zip 。公式ページ・collection license・同梱READMEいずれもCC0。許諾 https://creativecommons.org/publicdomain/zero/1.0/ 。
-- Pattern: 腕/脚は元モデルの断面周長に沿う近似型紙。内側シームと肘/膝で分割。背中は幅と高さによる平面投影。各方式の歪みが残るため、紙の仮合わせと50mm校正線を案内する。
+- Pattern: 腕/脚は元モデルの断面周長に沿う近似型紙。内側シームと肘/膝で分割。背中は両肩の後面までを含む幅と高さによる平面投影。各方式の歪みが残るため、紙の仮合わせと50mm校正線を案内する。
 - Template reference: https://www.stencilstudio.art/tools/patchwork-tattoo-sleeve-planner の腕SVGで肩→手首のテーパー、中心線、Full sleeve/Upper arm/Forearm区分を参考にした。構図用で実寸型紙ではないためコピーせず、モデル断面の周長から独自計算。
 - Transfer sources: https://junotattoodesigns.com/how-to-apply-a-tattoo-stencil/ (腕長による調整)、https://spirittattooproducts.com/pages/create-a-stencil (転写時の紙のずれ)。
 - Deferred: サンプル図案集、教材、宣伝文句、医療的な説明は中心フローに不要。
